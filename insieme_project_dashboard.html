@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>INSIEME — Pilot & CEEDS Implementation Progress Dashboard</title>
+<style>
+  :root{
+    --bg:#0e1726; --panel:#121d33; --panel2:#172541; --line:#23355c;
+    --ink:#e9eef8; --muted:#94a3c4; --accent:#5ea2ff; --accent2:#6ddacb;
+    --warn:#f5a623; --bad:#ef5b6b; --good:#3ecf8e; --na:#3a4a6b;
+    --d4e:#9b6dff; --ceeds:#5ea2ff; --ener:#f5a623; --connect:#ef5b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+       background:linear-gradient(180deg,#0a1120 0%, #0e1726 100%); color:var(--ink); min-height:100vh}
+  header{padding:22px 28px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.2px}
+  header .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .badges{display:flex;gap:8px;flex-wrap:wrap}
+  .badge{font-size:11px;padding:5px 10px;border-radius:999px;background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+  main{padding:22px 28px;display:grid;grid-template-columns:1fr;gap:22px;max-width:1600px;margin:0 auto}
+  .row{display:grid;gap:22px}
+  .row.k4{grid-template-columns:repeat(4,1fr)}
+  .row.k2{grid-template-columns:1.4fr 1fr}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .card h2{margin:0 0 4px 0;font-size:15px;letter-spacing:.3px;text-transform:uppercase;color:var(--accent2)}
+  .card .desc{color:var(--muted);font-size:12px;margin-bottom:14px}
+  .kpi{font-size:34px;font-weight:700;margin:4px 0 0 0}
+  .kpi small{font-size:13px;color:var(--muted);font-weight:400;display:block;margin-top:2px}
+
+  /* tabs */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{padding:7px 13px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:13px;cursor:pointer;color:var(--ink)}
+  .tab.active{background:var(--accent);color:#0b1426;border-color:var(--accent);font-weight:600}
+
+  /* timeline */
+  .timeline-wrap{position:relative;padding:36px 12px 24px 12px;overflow-x:auto}
+  .timeline-axis{position:relative;height:64px;min-width:1000px;margin-bottom:8px}
+  .timeline-bar{position:absolute;left:0;right:0;top:38px;height:4px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px}
+  .ms-dot{position:absolute;top:32px;width:16px;height:16px;border-radius:50%;background:var(--accent);border:3px solid #0e1726;transform:translateX(-50%);cursor:pointer;transition:transform .15s}
+  .ms-dot:hover{transform:translateX(-50%) scale(1.25)}
+  .ms-dot.done{background:var(--good)}
+  .ms-dot.current{background:var(--warn);box-shadow:0 0 0 6px rgba(245,166,35,.18)}
+  .ms-dot.future{background:var(--na)}
+  .ms-label{position:absolute;top:0;transform:translateX(-50%);font-size:11px;text-align:center;color:var(--muted);width:120px}
+  .ms-label b{display:block;color:var(--ink);font-size:12px;margin-bottom:2px}
+  .ms-date{position:absolute;top:56px;transform:translateX(-50%);font-size:10px;color:var(--muted)}
+
+  /* gantt */
+  .gantt{display:grid;grid-template-columns:200px 1fr;gap:0;margin-top:16px;border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:1100px}
+  .gantt-header{display:contents}
+  .gantt-header > div{background:var(--panel2);padding:8px 10px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--line)}
+  .gantt-q-header{display:grid;grid-template-columns:repeat(12,1fr);font-size:10px}
+  .gantt-q-header div{padding:6px 4px;text-align:center;border-left:1px solid var(--line)}
+  .gantt-row{display:contents}
+  .gantt-row > .name{padding:9px 10px;font-size:12px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;align-items:center;gap:6px;cursor:pointer}
+  .gantt-row > .name:hover{background:var(--panel2)}
+  .gantt-row > .track{position:relative;height:38px;border-bottom:1px solid var(--line);background:var(--panel);display:grid;grid-template-columns:repeat(12,1fr)}
+  .gantt-row > .track .qcol{border-left:1px solid var(--line)}
+  .gantt-bar{position:absolute;top:9px;height:20px;border-radius:4px;font-size:10px;color:#0b1426;display:flex;align-items:center;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+  .phase-prep{background:#6ddacb}
+  .phase-dev{background:#5ea2ff}
+  .phase-pilot{background:#f5a623}
+  .phase-demo{background:#9b6dff;color:#fff}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:10px}
+  .legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-right:5px}
+
+  /* heatmap */
+  .heat-wrap{overflow-x:auto}
+  .heat{border-collapse:separate;border-spacing:3px;font-size:11px;min-width:780px}
+  .heat th{padding:8px 6px;color:var(--muted);font-weight:600;text-align:center;font-size:10px;letter-spacing:.3px;text-transform:uppercase}
+  .heat td{width:42px;height:34px;text-align:center;border-radius:5px;background:var(--panel2);color:var(--muted);font-size:11px;cursor:pointer;transition:transform .1s}
+  .heat td:hover{transform:scale(1.1)}
+  .heat td.x{background:linear-gradient(135deg,#5ea2ff,#3973d6);color:#fff;font-weight:700}
+  .heat td.name{width:auto;text-align:left;padding:0 10px;background:transparent;color:var(--ink);font-size:12px;font-weight:500}
+  /* Maturity scale colours */
+  .heat td.m0{background:#2a3852;color:#5f7099}
+  .heat td.m1{background:#3973d6;color:#fff}
+  .heat td.m2{background:#5ea2ff;color:#0b1426;font-weight:700}
+  .heat td.m3{background:#6ddacb;color:#0b1426;font-weight:700}
+  .heat td.m4{background:#f5a623;color:#0b1426;font-weight:700}
+  .heat td.m5{background:#3ecf8e;color:#0b1426;font-weight:700}
+
+  /* Cross-border matrix */
+  .xb-wrap{overflow-x:auto;margin-top:6px}
+  .xb{border-collapse:separate;border-spacing:2px;font-size:10px;min-width:900px}
+  .xb th{padding:4px 2px;color:var(--muted);font-weight:600;text-align:center;font-size:9px;writing-mode:vertical-rl;transform:rotate(180deg);height:80px;vertical-align:bottom}
+  .xb th.rowhead{writing-mode:horizontal-tb;transform:none;text-align:left;padding:4px 8px;font-size:10px;font-weight:500;color:var(--ink)}
+  .xb td{width:26px;height:26px;text-align:center;border-radius:4px;background:var(--panel2);color:var(--muted);font-size:10px;cursor:pointer}
+  .xb td.diag{background:#1a2540;color:#3a4a6b}
+  .xb td.xb-strong{background:linear-gradient(135deg,#3ecf8e,#1ea872);color:#0b1426;font-weight:700}
+  .xb td.xb-med{background:linear-gradient(135deg,#5ea2ff,#3973d6);color:#fff;font-weight:700}
+  .xb td.xb-weak{background:linear-gradient(135deg,#6ddacb55,#6ddacb33);color:#9ed4cc}
+  .xb td:hover{outline:1px solid var(--accent)}
+
+  /* Objectives & EO panel */
+  .obj-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+  .obj{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12px;line-height:1.5}
+  .obj .ocode{display:inline-block;font-size:10px;padding:3px 8px;border-radius:5px;background:var(--accent);color:#0b1426;font-weight:700;margin-bottom:6px}
+  .obj.eo .ocode{background:var(--accent2);color:#fff}
+  .obj.uc .ocode{background:var(--warn);color:#0b1426}
+  .obj h4{margin:0 0 6px 0;font-size:13px;color:var(--ink)}
+  .obj .otag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;background:var(--panel);border:1px solid var(--line);color:var(--muted);margin-right:4px;margin-top:4px}
+
+  /* Risk register */
+  .risk-tbl{width:100%;border-collapse:collapse;font-size:12px}
+  .risk-tbl th{background:var(--panel2);padding:8px 10px;text-align:left;color:var(--muted);font-size:11px;letter-spacing:.3px;text-transform:uppercase;border-bottom:1px solid var(--line)}
+  .risk-tbl td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  .rag{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700}
+  .rag.red{background:rgba(239,91,107,.18);color:#ef5b6b;border:1px solid #ef5b6b}
+  .rag.amb{background:rgba(245,166,35,.18);color:#f5a623;border:1px solid #f5a623}
+  .rag.grn{background:rgba(62,207,142,.18);color:#3ecf8e;border:1px solid #3ecf8e}
+
+  /* Stepping stones (sustainability) */
+  .stones{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:8px}
+  .stone{flex:0 0 200px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;position:relative;font-size:12px;line-height:1.5}
+  .stone .snum{position:absolute;top:-10px;left:12px;background:var(--accent);color:#0b1426;width:24px;height:24px;border-radius:50%;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+  .stone h4{margin:6px 0 4px 0;font-size:13px;color:var(--ink)}
+  .stone .where{margin-top:8px;font-size:10px;color:var(--accent2);font-weight:600}
+
+  /* Mgmt gates inline timeline */
+  .mi-gate{position:absolute;top:24px;width:8px;height:8px;border-radius:50%;background:var(--warn);transform:translateX(-50%);border:2px solid #0e1726;cursor:pointer}
+  .mi-gate.passed{background:var(--good)}
+  .mi-label-sm{position:absolute;top:8px;transform:translateX(-50%);font-size:9px;color:var(--warn);text-align:center;width:60px}
+
+  /* KPI cards (GA-defined dissemination KPIs) */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .kpi-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
+  .kpi-card .v{font-size:18px;font-weight:700;color:var(--accent2)}
+  .kpi-card .l{font-size:10px;color:var(--muted);line-height:1.4;margin-top:2px}
+  .kpi-card .kid{font-size:9px;color:var(--accent);font-weight:700;margin-bottom:2px}
+
+  /* policy */
+  .policy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .policy{padding:14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);position:relative}
+  .policy .pname{font-size:13px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .policy .pdot{width:10px;height:10px;border-radius:50%}
+  .policy .pdesc{color:var(--muted);font-size:11px;line-height:1.5;margin-bottom:8px}
+  .policy ul{margin:0;padding-left:16px;font-size:11px;color:var(--ink);line-height:1.55}
+  .policy .links{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .policy .links a{font-size:10px;background:var(--panel);border:1px solid var(--line);padding:3px 7px;border-radius:5px;color:var(--accent);text-decoration:none}
+  .policy .links a:hover{background:var(--accent);color:#0b1426}
+
+  /* detail panel */
+  .detail{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:12px;color:var(--ink);min-height:80px;line-height:1.55}
+  .detail .empty{color:var(--muted);font-style:italic}
+  .detail h3{margin:0 0 6px 0;font-size:14px;color:var(--accent2)}
+  .detail .tags{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px 0}
+  .detail .tag{font-size:10px;padding:3px 7px;border-radius:5px;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+  .detail .tag.s{color:var(--accent)}
+
+  .footer-note{color:var(--muted);font-size:11px;padding:0 28px 30px 28px;max-width:1600px;margin:0 auto;line-height:1.6}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  @media (max-width: 1100px){
+    .row.k4{grid-template-columns:repeat(2,1fr)}
+    .row.k2{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>INSIEME — Pilot & CEEDS Implementation Progress Dashboard</h1>
+    <div class="sub">Common European Energy Data Space · WP4 Deployments · Grant Agreement 101194952 · Sources: D4.1 (M12), Grant Agreement (DoA), TNO Vector (Feb 2026) · Current as of May 2026</div>
+  </div>
+  <div class="badges">
+    <span class="badge">20 Deployments</span>
+    <span class="badge">6 Objectives · 6 EOs</span>
+    <span class="badge">7 Use Cases</span>
+    <span class="badge">11 Project KPIs (Table 1)</span>
+    <span class="badge">8 Meta-Services + DCI</span>
+    <span class="badge">11 Reference Models</span>
+    <span class="badge">M36 · Apr 2028</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- KPI row -->
+  <section class="row k4">
+    <div class="card"><h2>Overall Progress</h2><div class="desc">Project months elapsed (M0 = Apr 2025)</div>
+      <div class="kpi">14 / 36 <small>≈ 39% of timeline</small></div></div>
+    <div class="card"><h2>Pilots Live</h2><div class="desc">Currently in operation phase</div>
+      <div class="kpi">0 / 20 <small>First pilots start by M18 (Oct 2026)</small></div></div>
+    <div class="card"><h2>Reference Models</h2><div class="desc">Of estimated 15+ to be developed</div>
+      <div class="kpi">11 <small>Published on architecture.insieme.energy</small></div></div>
+    <div class="card"><h2>Cross-border Pilots</h2><div class="desc">Planned cross-MS data exchange per §3.x.3</div>
+      <div class="kpi">12 / 20 <small>8 explicit "no/limited" · 4 already in transnational DS</small></div></div>
+  </section>
+
+  <!-- Objectives, Expected Outcomes & Use Cases (from Grant Agreement) -->
+  <section class="card">
+    <h2>Project Objectives, Expected Outcomes & Use Cases</h2>
+    <div class="desc">From the Grant Agreement (DoA Annex 1). Each pilot's contribution traces back to these. EO = Expected Outcomes from the DIGITAL-2024-CLOUD-AI-06 call topic (legal commitments). I-OB = INSIEME's own Objectives. I-UC = the seven use case domains driving WP3+WP4.</div>
+    <div class="tabs" style="margin:6px 0 12px 0">
+      <div class="tab active" data-objtab="iob">I-OB · 6 Objectives</div>
+      <div class="tab" data-objtab="eo">EO · 6 Expected Outcomes (call)</div>
+      <div class="tab" data-objtab="uc">I-UC · 7 Use Cases</div>
+    </div>
+    <div class="obj-grid" id="objGrid">
+      <!-- injected -->
+    </div>
+  </section>
+
+  <!-- Project-level KPIs (GA Table 1) — explicit measurable targets -->
+  <section class="card">
+    <h2>Project-Level KPIs (Grant Agreement Table 1)</h2>
+    <div class="desc">The 11 measurable project KPIs from Table 1 of the Grant Agreement (DoA §1.1.2). These are <b style="color:var(--ink)">the canonical success criteria</b> against which INSIEME will be evaluated by HaDEA. Each KPI is linked to one or more I-OBs and is driven by one or more WP4 pilots. Click any KPI for the linked pilots that contribute evidence.</div>
+    <div class="kpi-table-wrap">
+      <table class="risk-tbl" id="pkpiTbl">
+        <!-- injected -->
+      </table>
+    </div>
+    <div class="detail" style="margin-top:12px" id="pkpiDetail"><span class="empty">Click any KPI row to see the linked I-OBs and the pilots that contribute evidence toward it.</span></div>
+  </section>
+
+  <!-- Timeline / milestones -->
+  <section class="card">
+    <h2>Project Timeline & D4.1 Submission Milestones</h2>
+    <div class="desc">D4.1 is updated bi-annually. Each milestone marks a new version of the deliverable and a maturity gate for the pilots and CEEDS services. Click any milestone for details.</div>
+    <div class="timeline-wrap">
+      <div class="timeline-axis" id="timelineAxis">
+        <div class="timeline-bar"></div>
+        <!-- dots injected by JS -->
+      </div>
+    </div>
+    <div class="detail" id="msDetail"><span class="empty">Click a milestone above to see deliverables, expected pilot states and policy dependencies.</span></div>
+  </section>
+
+  <!-- Deployment Gantt -->
+  <section class="card">
+    <h2>Deployment Gantt — 20 Pilots Across the 36-Month Timeline</h2>
+    <div class="desc">Phases: Preparation → Development → Pilot Operation → Demonstration. Click a deployment name for its description, S-service dependencies and cross-border scope.</div>
+    <div class="tabs" style="margin:6px 0 12px 0">
+      <div class="tab active" data-cluster="all">All deployments</div>
+      <div class="tab" data-cluster="customer">Customer-facing</div>
+      <div class="tab" data-cluster="ec">Energy Communities (EC_Scale)</div>
+      <div class="tab" data-cluster="flex">Flexibility & FCA</div>
+      <div class="tab" data-cluster="grid">Grid / DSO planning</div>
+      <div class="tab" data-cluster="emob">e-Mobility</div>
+      <div class="tab" data-cluster="sector">Sector coupling</div>
+    </div>
+    <div class="gantt" id="gantt">
+      <!-- injected -->
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:#6ddacb"></span>Preparation / RM alignment</span>
+      <span><span class="sw" style="background:#5ea2ff"></span>Development & integration</span>
+      <span><span class="sw" style="background:#f5a623"></span>Pilot operation</span>
+      <span><span class="sw" style="background:#9b6dff"></span>Demonstration & dissemination</span>
+    </div>
+    <div class="detail" style="margin-top:14px" id="depDetail"><span class="empty">Click a deployment name for details.</span></div>
+  </section>
+
+  <!-- Heatmap and policy side by side -->
+  <section class="row k2">
+
+    <div class="card">
+      <h2>Deployment × CEEDS Meta-Service Matrix</h2>
+      <div class="desc">From Table 1 of D4.1, extended to a <b style="color:var(--ink)">0–5 maturity scale</b> per service (instead of binary X). Score reflects how far each deployment has progressed in adopting that service. DCI = Digital Customer Interface.</div>
+      <div class="tabs" style="margin:6px 0 12px 0">
+        <div class="tab active" data-heatmode="maturity">Maturity score (0–5)</div>
+        <div class="tab" data-heatmode="binary">Binary (D4.1 Table 1)</div>
+      </div>
+      <div class="heat-wrap">
+        <table class="heat" id="heat">
+          <!-- injected -->
+        </table>
+      </div>
+      <div class="legend" id="heatLegend">
+        <span><span class="sw" style="background:#2a3852"></span>0 — Not in scope</span>
+        <span><span class="sw" style="background:#3973d6"></span>1 — Identified</span>
+        <span><span class="sw" style="background:#5ea2ff"></span>2 — Planned</span>
+        <span><span class="sw" style="background:#6ddacb"></span>3 — In development</span>
+        <span><span class="sw" style="background:#f5a623"></span>4 — Integration testing</span>
+        <span><span class="sw" style="background:#3ecf8e"></span>5 — Pilot operational</span>
+      </div>
+      <div class="detail" style="margin-top:12px" id="serviceDetail"><span class="empty">Click any header (S1–S8 / DCI) or cell for definition and dependent pilots.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>External Policy & Standards Dependencies</h2>
+      <div class="desc">CEEDS does not exist in isolation. INSIEME's design and roadmap are gated by parallel EU policy and technical bodies. Updates from these affect what D4.1 will report next.</div>
+      <div class="policy-grid">
+        <div class="policy">
+          <div class="pname"><span class="pdot" style="background:var(--d4e)"></span>D4E — Data for Energy Expert Group</div>
+          <div class="pdesc">DG ENER + DG CNECT expert group defining the federation model & meta-services. CEEDS S1–S8 terminology is aligned with D4E outcomes.</div>
+          <ul>
+            <li>Governance & operating model recommendations</li>
+            <li>CEEDS Common Information Model alignment</li>
+            <li>Reference architecture endorsement</li>
+          </ul>
+          <div class="links">
+            <a href="https://digital-strategy.ec.europa.eu/en/policies/data-energy" target="_blank">EU Data4Energy</a>
+          </div>
+        </div>
+
+        <div class="policy">
+          <div class="pname"><span class="pdot" style="background:var(--ceeds)"></span>CEEDS Operational Entity</div>
+          <div class="pdesc">The governance entity to operate the federated dataspace. INSIEME prototype must hand off to this entity for sustainability post-2028.</div>
+          <ul>
+            <li>National Data Space Facilitator alignment</li>
+            <li>SIMPL Open Toolset & DSSC compatibility</li>
+            <li>Eclipse Marketplace evaluation (S8)</li>
+          </ul>
+          <div class="links">
+            <a href="https://dssc.eu" target="_blank">DSSC</a>
+            <a href="https://simpl-programme.ec.europa.eu" target="_blank">SIMPL</a>
+          </div>
+        </div>
+
+        <div class="policy">
+          <div class="pname"><span class="pdot" style="background:var(--ener)"></span>DG ENER</div>
+          <div class="pdesc">Energy regulation gates: Network Codes, CIR 2023/1162 (metering data), Demand Response and Electricity Balancing Guidelines, Flexible Connection Agreements.</div>
+          <ul>
+            <li>CIR (EU) 2023/1162 → S3, S7, DCI</li>
+            <li>Network Code on Demand Response → T4-4 procedures</li>
+            <li>FCA legal basis → T4.4 (ARE, flexgrid, PVflex)</li>
+          </ul>
+          <div class="links">
+            <a href="https://energy.ec.europa.eu" target="_blank">DG ENER</a>
+            <a href="https://eur-lex.europa.eu/eli/reg_impl/2023/1162/oj" target="_blank">CIR 2023/1162</a>
+          </div>
+        </div>
+
+        <div class="policy">
+          <div class="pname"><span class="pdot" style="background:var(--connect)"></span>DG CNECT</div>
+          <div class="pdesc">Digital Europe Programme co-funder. Sets dataspace interoperability requirements, Common European Data Spaces framework, and eIDAS rules.</div>
+          <ul>
+            <li>Data Act / Data Governance Act compliance</li>
+            <li>eIDAS for participant identity (S1)</li>
+            <li>Common Data Spaces interoperability</li>
+          </ul>
+          <div class="links">
+            <a href="https://digital-strategy.ec.europa.eu" target="_blank">DG CNECT</a>
+            <a href="https://digital-strategy.ec.europa.eu/en/policies/data-act" target="_blank">Data Act</a>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:10px 12px;background:var(--panel2);border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--ink);line-height:1.5">
+        <b style="color:var(--accent2)">Why these matter for D4.1 updates:</b> The bi-annual D4.1 versions (M12 → M18 → M24 → M30 → M36) must report alignment with any new D4E, DSSC or Network Code outputs published in the preceding six months. Slippage in any external dependency forces re-scoping of WP3 development and may delay pilot operation gates.
+      </div>
+    </div>
+  </section>
+
+  <!-- Cross-border test matrix -->
+  <section class="card">
+    <h2>Cross-Border Test Matrix — Which Pilots Exchange Data With Which</h2>
+    <div class="desc">Derived from §3.x.3 of D4.1 ("Current integration with data spaces and cross-border data exchange requirements") and from §3.1's narrative on pilot clusters. Cells show planned data exchange between pairs of pilots. <b style="color:var(--ink)">This is the central CEEDS value proposition but is not visualised anywhere in D4.1</b>. Click any cell for the rationale.</div>
+    <div class="legend" style="margin:8px 0 12px 0">
+      <span><span class="sw" style="background:#3ecf8e"></span>Strong — explicit cross-pilot validation planned</span>
+      <span><span class="sw" style="background:#5ea2ff"></span>Medium — shared reference model / common framework</span>
+      <span><span class="sw" style="background:#6ddacb55"></span>Weak — implicit (same cluster, replication potential)</span>
+      <span><span class="sw" style="background:#1a2540"></span>No exchange planned</span>
+    </div>
+    <div class="xb-wrap">
+      <table class="xb" id="xbMatrix">
+        <!-- injected -->
+      </table>
+    </div>
+    <div class="detail" style="margin-top:12px" id="xbDetail"><span class="empty">Click any cell to see the rationale, evidence source in D4.1, and CEEDS services that the exchange relies on.</span></div>
+    <div style="margin-top:12px;padding:10px 12px;background:var(--panel2);border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--ink);line-height:1.55">
+      <b style="color:var(--accent2)">Summary at M14:</b> 5 pilots explicitly do <b>not</b> require cross-border exchange (ARE, Hierarchies, Cuerva LL, Metering Point Effectiveness, PEGNIPO — though PEGNIPO is cross-sectoral within Portugal). Most planned cross-border value is concentrated in the four EC_Scale pilots, the two e-mobility pilots, and the two customer-facing apps. <b style="color:var(--warn)">Recommendation:</b> the next D4.1 update should explicitly tabulate this matrix, define test scenarios per cell, and assign owners for each cross-pilot exchange.
+    </div>
+  </section>
+
+  <!-- Use Case (I-UC) coverage matrix -->
+  <section class="card">
+    <h2>Pilots × Use Cases (I-UC-1 to I-UC-7)</h2>
+    <div class="desc">The seven Use Case domains defined in the Grant Agreement. This view shows which use case(s) each pilot validates. Coverage is the legal commitment to the funding authority — every I-UC must be evidenced by at least one operational pilot by M36.</div>
+    <div class="heat-wrap">
+      <table class="heat" id="ucHeat">
+        <!-- injected -->
+      </table>
+    </div>
+    <div class="legend" style="margin-top:10px">
+      <span><span class="sw" style="background:#3ecf8e"></span>Primary — pilot directly validates the use case</span>
+      <span><span class="sw" style="background:#5ea2ff"></span>Secondary — pilot contributes evidence</span>
+      <span><span class="sw" style="background:#2a3852"></span>Not in scope</span>
+    </div>
+    <div class="detail" style="margin-top:12px" id="ucDetail"><span class="empty">Click any use case header (I-UC-1 to 7) for the description and the pilots that validate it.</span></div>
+  </section>
+
+  <!-- Risk register moved to the very end of the dashboard -->
+
+  <!-- WP5: Business Models, Sustainability & Financing (anchored in TNO full report) -->
+  <section class="card">
+    <h2>WP5 — Business Models, Sustainability & Financing</h2>
+    <div class="desc">INSIEME's <b style="color:var(--ink)">EO2</b> and <b style="color:var(--ink)">I-OB-4</b> commit to "suitable business models that ensure the maintenance and upscaling of CEEDS beyond the lifetime of the project". The full TNO report "Bridging the Financing Gap for Data Sharing Initiatives" (TNO 2025 P12826, 1 Dec 2025) provides the most relevant empirical evidence available: <b style="color:var(--warn)">85%+ of data space initiatives stall after the pilot phase</b> because they cannot transition from grant-funded to financially viable operating models. This section applies the TNO findings to WP5.</div>
+
+    <div class="tabs" style="margin:6px 0 14px 0">
+      <div class="tab active" data-bmtab="overview">Overview & insights</div>
+      <div class="tab" data-bmtab="cases">3 case studies</div>
+      <div class="tab" data-bmtab="stones">6 stepping-stones</div>
+      <div class="tab" data-bmtab="routes">3 archetypal routes</div>
+      <div class="tab" data-bmtab="readiness">Readiness markers (Table 4)</div>
+      <div class="tab" data-bmtab="pitfalls">5 pitfalls</div>
+      <div class="tab" data-bmtab="recs">Recommendations</div>
+      <div class="tab" data-bmtab="assess">INSIEME positioning</div>
+    </div>
+    <div id="bmContent">
+      <!-- injected by renderBMTab -->
+    </div>
+
+    <div style="margin-top:14px;padding:10px 12px;background:var(--panel2);border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--ink);line-height:1.55">
+      <b style="color:var(--accent2)">Strategic warning from TNO:</b> "Financing alone doesn't make a data space sustainable. It's the combination of governance maturity, tangible value, and shared commitment that keeps an ecosystem alive." For INSIEME, this means WP5 (T5.1–T5.8) and WP4 pilots must converge on visible economic value <b>before</b> grant expiry — not after. M30 (D4.1 v4, Oct 2027) is the practical deadline to demonstrate willingness-to-pay from pilots' commercial partners.
+    </div>
+  </section>
+
+  <!-- KPIs and Indicators per Work Package (Grant Agreement) -->
+  <section class="card">
+    <h2>Indicators & KPIs per Work Package (Grant Agreement)</h2>
+    <div class="desc">All six work packages, each with its tracked indicators. <b style="color:var(--ink)">Provenance:</b> the Grant Agreement defines three explicit KPI tables — <b>Table 1 (11 project-level KPIs, shown separately above)</b>, Table 4 (8 Management Indicators, WP1) and Table 6 (14 Dissemination KPIs, WP6). For WP2/3/4/5 the indicators below are derived from the GA's task descriptions, deliverable schedule, and EO commitments — they are real and traceable to the document but were not originally tabulated as "KPIs" inside their own WP. Recommendation: cross-reference each derived indicator with the relevant Table 1 KPI in the D6.5 update at M18.</div>
+    <div class="tabs" style="margin:6px 0 12px 0">
+      <div class="tab active" data-wptab="WP1">WP1 — Management</div>
+      <div class="tab" data-wptab="WP2">WP2 — Architecture</div>
+      <div class="tab" data-wptab="WP3">WP3 — Implementation</div>
+      <div class="tab" data-wptab="WP4">WP4 — Deployments</div>
+      <div class="tab" data-wptab="WP5">WP5 — Sustainability</div>
+      <div class="tab" data-wptab="WP6">WP6 — Dissemination</div>
+    </div>
+    <div id="wpKpiHeader" style="padding:10px 12px;background:var(--panel2);border-radius:8px;font-size:12px;color:var(--ink);margin-bottom:12px;line-height:1.55">
+      <!-- injected -->
+    </div>
+    <div class="kpi-grid" id="wpKpis">
+      <!-- injected -->
+    </div>
+  </section>
+
+  <!-- Reference Models / Procedures summary -->
+  <section class="card">
+    <h2>Reference Models & Procedures Progress</h2>
+    <div class="desc">11 reference models published so far. Reference models = structured definitions of roles, procedures, and information objects (per SGAM + HEMRM + IEC CIM). Each procedure is mapped to S1–S8 services in Annex I of D4.1.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:10px">
+      <div class="policy"><div class="pname">T4.2 — Metering & Customer Data</div>
+        <ul><li>Access to historical / near-real-time data</li><li>Master data access</li><li>Implicit flexibility signals</li><li>Customer switching</li></ul></div>
+      <div class="policy"><div class="pname">T4.3 — Energy Communities (CESU)</div>
+        <ul><li>CESU registration & allocation</li><li>Internal settlement w/wo flexibility</li><li>Flexibility market participation</li><li>16 procedures mapped</li></ul></div>
+      <div class="policy"><div class="pname">T4.4 — Flexibility & FCAs</div>
+        <ul><li>FCA initialisation, onboarding, revocation, termination</li><li>Activation / limitation events</li><li>Demand Response (33 procedures)</li></ul></div>
+      <div class="policy"><div class="pname">T4.5 — Electromobility</div>
+        <ul><li>Sector coupling (transport ↔ electricity)</li><li>OTLL Smart Charging</li><li>eHDMobility (heavy-duty)</li></ul></div>
+      <div class="policy"><div class="pname">T4.6 — Hierarchies</div>
+        <ul><li>Optimised RES integration</li><li>Structured data exchange</li></ul></div>
+      <div class="policy"><div class="pname">T4.7 — AI-enabled support</div>
+        <ul><li>AIGridOpt</li><li>INTERFLEX (GR)</li></ul></div>
+  </section>
+
+  <!-- Risk register at the very end (GA-defined) -->
+  <section class="card">
+    <h2>Risk Register (from Grant Agreement, with M14 RAG status)</h2>
+    <div class="desc">Eight critical risks from the Grant Agreement (DoA section on Critical risks and risk management strategy), with current (M14) Red/Amber/Green status. Risk #3 (architecture misalignment), #4 (security/privacy) and #5 (interoperability) are the standing technical threats. <b style="color:var(--warn)">Risk #7 (sustainability/willingness-to-pay)</b> is rated low/low in the GA but flagged amber here based on TNO Vector evidence (>85% of data spaces fail post-grant). The dashboard owner should refresh RAG status at every D4.1 milestone.</div>
+    <table class="risk-tbl" id="riskTbl">
+      <!-- injected -->
+    </table>
+  </section>
+
+</main>
+
+<div class="footer-note">
+  <b>Sources:</b> INSIEME Deliverable D4.1 (M12, March 2026), Annexes I–III. CEEDS Meta-Service definitions per Section 2.3 of D4.1. WP4 architecture per the project's layered diagram (Deployments → Functional Building Blocks → Meta-Level Services → Development). External policy badges link to public EU sources.
+  &nbsp;·&nbsp; <span class="pill">Dashboard prototype</span>
+</div>
+
+<script>
+/* ===================== DATA ===================== */
+
+const SERVICES = [
+  {id:"S1", name:"CEEDS Participants Registry (CPR)", desc:"Federated participant onboarding, identity management, trust verification."},
+  {id:"S2", name:"European Vocabulary Hub (EVH)", desc:"Harmonised vocabularies, ontologies, semantic translation for cross-border exchange."},
+  {id:"S3", name:"European Reference Data Registry (ERDR)", desc:"Authoritative master data, reference identifiers, accounting-point data."},
+  {id:"S4", name:"Common API for European Processes (CAEP)", desc:"Gateway for standardised cross-border service invocation & orchestration."},
+  {id:"S5", name:"European Service Level Overview (ESLO)", desc:"Monitoring & transparency of distributed service performance."},
+  {id:"S6", name:"European Interoperability Testing Service (EITS)", desc:"Conformance testing, certification, compliance monitoring."},
+  {id:"S7", name:"EU-wide Regulated-Domain Services (ERDS)", desc:"Regulatory reporting, compliance, cross-border regulatory coordination."},
+  {id:"S8", name:"European Data, Services & Models Marketplace (EDSM)", desc:"Service discovery, publication, contracting via dataspace mechanisms."},
+  {id:"DCI", name:"Digital Customer Interface", desc:"User-facing access to services, consent management & orchestration."},
+];
+
+// 20 deployments. Phases are illustrative quarters within the 12-quarter (M1–M36) timeline:
+// Q1=2025Q2, Q2=2025Q3, ..., Q12=2028Q1. (Following Figure 7 in D4.1.)
+const DEPLOYMENTS = [
+  {id:"SF",  name:"SavingsFootprint",     cluster:"customer", task:"T4.2", partners:"R8, TD, OKE",
+    services:["S1","S2","S3","S4","DCI"],
+    phases:[{p:"prep",start:1,end:4},{p:"dev",start:5,end:8},{p:"pilot",start:9,end:11},{p:"demo",start:11,end:12}],
+    desc:"Customer-facing app empowering households via personalised savings tracking from metering data. Tests S1–S4 + DCI for consent and data access.",
+    cross:"Connected to Estonian energy data hub. Cross-border exchange necessary to deploy across Europe (per §3.2.3). Strong cluster overlap with ECLIPSE for customer-data procedures."},
+
+  {id:"EC",  name:"ECLIPSE energy app",  cluster:"customer", task:"T4.2", partners:"OKE et al.",
+    services:["S1","S2","S3","S4","S5","S6","DCI"],
+    phases:[{p:"prep",start:1,end:4},{p:"dev",start:5,end:8},{p:"pilot",start:9,end:11},{p:"demo",start:11,end:12}],
+    desc:"Customer-centric energy app — touches 7 of 9 services, the broadest customer-side coverage.",
+    cross:"Implements CERF (Common European Reference Framework). Cross-border via harmonised data models, NILM training datasets and market signals — enabling deployment in any MS connected to CEEDS (§3.3.3)."},
+
+  {id:"ECF", name:"EC_Scale — French (COMFLEX)", cluster:"ec", task:"T4.3 & T4.4", partners:"ENEDIS, ENL",
+    services:["S1","S2","S4","S6","DCI"],
+    phases:[{p:"prep",start:1,end:5},{p:"dev",start:5,end:9},{p:"pilot",start:9,end:12}],
+    desc:"French pilot of EC_Scale — extends collective self-consumption framework with flexibility programs.",
+    cross:"Already embedded in transnational data spaces via Digital4Grids' DER orchestrator hub, Eddie Services (metering data) and Eclipse Project CERF (IEC 62746-4). API on flexibilites-enedis.fr based on IEC 62325."},
+
+  {id:"ECP", name:"EC_Scale — Portuguese", cluster:"ec", task:"T4.3", partners:"PT pilots",
+    services:["S1","S2","S3","S4","S5","S6","DCI"],
+    phases:[{p:"prep",start:1,end:4},{p:"dev",start:5,end:8},{p:"pilot",start:9,end:12}],
+    desc:"Portuguese EC_Scale pilot — broadest service coverage among EC_Scale pilots.",
+    cross:"RECreation platform to become CEEDS service usable cross-pilot by different MS. INESC TEC prior cross-border experience via Enershare, Green.Dat.AI, Hedge.IoT (§3.5.3)."},
+
+  {id:"ECS", name:"EC_Scale — Spanish (Can Forns)", cluster:"ec", task:"T4.3", partners:"Elecsum, R8",
+    services:["S1","S2","S4","S5"],
+    phases:[{p:"prep",start:2,end:5},{p:"dev",start:6,end:9},{p:"pilot",start:9,end:12}],
+    desc:"Already-operational collective self-consumption (Can Forns). Tests if INSIEME simplifies onboarding & consent vs current manual flow with Datadis.",
+    cross:"National focus (Datadis ES). No explicit cross-border data exchange in §3.6.3. Potential link to AIIDA/EDDIE via Shelly sub-metering."},
+
+  {id:"ECA", name:"EC_Scale — Austrian",  cluster:"ec", task:"T4.3", partners:"AT pilots",
+    services:[],
+    phases:[{p:"prep",start:2,end:6},{p:"dev",start:6,end:10},{p:"pilot",start:10,end:12}],
+    desc:"Backbone.one-led. Tests CEEDS with multi-DSO onboarding, fault tolerance, adaptive energy-allocation control. Services mapping still TBD in D4.1 Table 1 — data gap to resolve.",
+    cross:"Cross-border via standardised procedures for energy sharing units across multiple countries (§3.7.3). Already embedded in AT national data space via EDA."},
+
+  {id:"CLL", name:"Cuerva's Living Lab", cluster:"flex", task:"T4.4", partners:"Cuerva (ES DSO)",
+    services:["S2","S4","S5","S6"],
+    phases:[{p:"prep",start:1,end:4},{p:"dev",start:4,end:8},{p:"pilot",start:8,end:11},{p:"demo",start:11,end:12}],
+    desc:"DSO-led living lab for flexibility, integrating PV and battery storage; aggregator extension planned.",
+    cross:"No cross-border required (§3.8.3) — only limited aggregated/anonymised data."},
+
+  {id:"JEN", name:"Jenny+",              cluster:"flex", task:"T4.4", partners:"AT/DE flex partners",
+    services:["S2","S4","S5","S6","S8"],
+    phases:[{p:"prep",start:1,end:4},{p:"dev",start:4,end:8},{p:"pilot",start:8,end:11},{p:"demo",start:11,end:12}],
+    desc:"Flexibility orchestration with marketplace component (S8).",
+    cross:"Marketplace standards alignment."},
+
+  {id:"SPD", name:"SP–Dataspace Connection Adapter", cluster:"flex", task:"T4.4", partners:"Multiple SPs",
+    services:["S1","S2","S3","S4","S6","S8"],
+    phases:[{p:"prep",start:1,end:5},{p:"dev",start:5,end:9},{p:"pilot",start:9,end:12}],
+    desc:"Adapter enabling Service Providers to connect to CEEDS — heavy infrastructure dependency.",
+    cross:"Designed for cross-MS use."},
+
+  {id:"MPE", name:"Metering Point Effectiveness", cluster:"grid", task:"T4.4", partners:"DSO partners",
+    services:["S2","S3","S6"],
+    phases:[{p:"prep",start:1,end:5},{p:"dev",start:5,end:9},{p:"pilot",start:9,end:12}],
+    desc:"AI-enabled assessment of metering point performance.",
+    cross:"None at pilot."},
+
+  {id:"ARE", name:"ARE",                  cluster:"flex", task:"T4.4", partners:"DSO partner",
+    services:["S2","S3","S4","S6"],
+    phases:[{p:"prep",start:1,end:4},{p:"dev",start:4,end:8},{p:"pilot",start:8,end:11},{p:"demo",start:11,end:12}],
+    desc:"RomeFlex local flexibility market (IT). 5-phase GAP analysis → connector integration → CEEDS Application-level Building Block → Rome pilot.",
+    cross:"Explicit: no need for cross-border data exchange — all data handled within the local market (§3.12.3)."},
+
+  {id:"FXG", name:"flexgrid",             cluster:"flex", task:"T4.4", partners:"DSO partner",
+    services:["S2","S4","S5","S6","S8"],
+    phases:[{p:"prep",start:1,end:4},{p:"dev",start:4,end:8},{p:"pilot",start:8,end:11},{p:"demo",start:11,end:12}],
+    desc:"Grid flexibility management with marketplace dimension.",
+    cross:"None at pilot."},
+
+  {id:"PVF", name:"PVflex",               cluster:"flex", task:"T4.4", partners:"PV/flex partner",
+    services:["S2","S3","S4","S5","S6"],
+    phases:[{p:"prep",start:1,end:4},{p:"dev",start:4,end:8},{p:"pilot",start:8,end:11},{p:"demo",start:11,end:12}],
+    desc:"PV-flexibility integration in distribution networks.",
+    cross:"None at pilot."},
+
+  {id:"EHD", name:"eHDMobility",          cluster:"emob", task:"T4.5", partners:"Mobility partner",
+    services:["S1","S2","S3","S4","S5","DCI"],
+    phases:[{p:"prep",start:1,end:5},{p:"dev",start:5,end:9},{p:"pilot",start:9,end:12}],
+    desc:"VOL/VEL/RISE/SCB/SWEA. Heavy-duty electrification across borders. Integrates data from vehicle OEMs, CPOs, energy actors. Tests INSIEME's interoperability for cross-border grid-aware freight.",
+    cross:"Cross-border supports long-haul electrified freight involving neighbouring MS (SE↔neighbours). Common scope with OTLL SC for smart charging."},
+
+  {id:"OTLL",name:"OpenThor Living Lab (SC)", cluster:"emob", task:"T4.5", partners:"OpenThor",
+    services:["S1","S2","S3","S4","S6","DCI"],
+    phases:[{p:"prep",start:1,end:5},{p:"dev",start:5,end:9},{p:"pilot",start:9,end:12}],
+    desc:"VITO/ELIA. Flanders regulatory sandbox at Thor Park, Genk. Smart charging + flexibility use cases, integrated with SmarThor cloud data platform.",
+    cross:"Aggregated/standardised smart-charging & flexibility data across MS for comparison and replication, rather than direct operational control across borders (§3.16.3)."},
+
+  {id:"HIE", name:"Hierarchies",          cluster:"grid", task:"T4.6", partners:"RES partners",
+    services:["S2","S4","S5","S6","DCI"],
+    phases:[{p:"prep",start:1,end:5},{p:"dev",start:5,end:9},{p:"pilot",start:9,end:12}],
+    desc:"DTU-led (TREFOR, CDK, Energinet, NTUA, ENFOR). Spatial-temporal data hierarchies to manage uncertainty in power systems with high RES shares. Probabilistic forecasts across asset/local/regional/system-wide levels.",
+    cross:"Explicit: no cross-border data exchange required (§3.17.3). National scope — Center Denmark integration."},
+
+  {id:"INT", name:"INTERFLEX (GR)",       cluster:"flex", task:"T4.7", partners:"Greek partner",
+    services:["S1","S2","S3","S6","S8"],
+    phases:[{p:"prep",start:2,end:6},{p:"dev",start:6,end:10},{p:"pilot",start:10,end:12}],
+    desc:"Greek interoperable flexibility deployment. Not yet embedded in any data space at M14.",
+    cross:"No cross-border requirement stated in D4.1 (§3.18.3)."},
+
+  {id:"AIG", name:"AIGridOpt",            cluster:"grid", task:"T4.7", partners:"AI partner",
+    services:["S2","S4","S5","S6"],
+    phases:[{p:"prep",start:2,end:6},{p:"dev",start:6,end:10},{p:"pilot",start:10,end:12}],
+    desc:"EnliteAI/STMK/Enfor. AT. AI/ML decision-support layer on top of flexgrid (T4.4) for LV congestion/voltage control, day-ahead and ad-hoc flex planning. Runs in digital twin/shadow mode.",
+    cross:"No cross-border requirement at pilot — paired with flexgrid (intra-AT, same DSO)."},
+
+  {id:"PEG", name:"PEGNIPO",              cluster:"sector", task:"T4.7", partners:"Multi-vector partner",
+    services:["S1","S2","S6"],
+    phases:[{p:"prep",start:1,end:5},{p:"dev",start:5,end:9},{p:"pilot",start:9,end:12}],
+    desc:"REN/INESC TEC/CEVE. PT-only. Coordinated planning of electricity and gas networks using digital twins at R&D Nester's RTPS Lab (listed in JRC Smart Grid Lab Inventory). TSO-e ↔ TSO-g ↔ DSO coordination, hydrogen electrolysers.",
+    cross:"Cross-sectoral (electricity ↔ gas) within Portugal, not cross-border. 27 CEVE consumers contribute meter/environmental data."},
+
+  {id:"SCD", name:"SCDI",                 cluster:"sector", task:"T4.8", partners:"Sector coupling partners",
+    services:["S2","S5","S7","S8"],
+    phases:[{p:"prep",start:1,end:5},{p:"dev",start:5,end:9},{p:"pilot",start:9,end:12}],
+    desc:"Sector-coupled data interoperability — entry point for district heating, gas, wholesale markets. Touches use case 08 (other vectors).",
+    cross:"Cross-vector and cross-MS by design. Limited cross-border at pilot but architecture is the gateway for the non-electricity use cases."},
+];
+
+// Maturity scoring (0-5) per Deployment × Service.
+// Rubric: 0 = not in scope, 1 = identified, 2 = planned (in deployment plan),
+// 3 = in development (current dev phase), 4 = integration testing, 5 = pilot operational.
+// At M14 (May 2026) baseline: pilots not yet started; most cells are 2 (planned) or 3 (dev).
+// Higher scores reserved for deployments with explicit pre-existing integration (EC_Scale FR via
+// Digital4Grids/Eddie/Eclipse CERF, EC_Scale ES with Datadis, EC_Scale AT with EDA national DS,
+// ARE with RomeFlex, OTLL with SmarThor, ECLIPSE with CERF, SavingsFootprint with Estonian DH).
+// Anything not in the original D4.1 Table 1 stays at 0 even where DCI is plausibly needed,
+// flagging gaps to resolve in M18. Score = 0 means "blank in Table 1".
+const MATURITY = {
+  // map: deploymentId -> { serviceId: score }
+  SF:  {S1:3,S2:3,S3:3,S4:3,S5:0,S6:0,S7:0,S8:0,DCI:2},
+  EC:  {S1:2,S2:3,S3:2,S4:2,S5:2,S6:2,S7:0,S8:0,DCI:3},
+  ECF: {S1:4,S2:4,S3:0,S4:4,S5:0,S6:3,S7:0,S8:0,DCI:3},   // already in transnational DS
+  ECP: {S1:3,S2:3,S3:3,S4:3,S5:2,S6:3,S7:0,S8:0,DCI:3},   // RECreation evolves to CEEDS service
+  ECS: {S1:2,S2:3,S3:0,S4:3,S5:2,S6:0,S7:0,S8:0,DCI:0},   // Datadis already, manual elsewhere
+  ECA: {S1:3,S2:2,S3:2,S4:3,S5:2,S6:0,S7:0,S8:0,DCI:2},   // backbone.one + EDA national DS
+  CLL: {S1:0,S2:2,S3:0,S4:2,S5:2,S6:2,S7:0,S8:0,DCI:0},
+  JEN: {S1:0,S2:2,S3:0,S4:2,S5:2,S6:2,S7:0,S8:2,DCI:0},
+  SPD: {S1:2,S2:3,S3:2,S4:3,S5:0,S6:2,S7:0,S8:2,DCI:0},
+  MPE: {S1:0,S2:2,S3:2,S4:0,S5:0,S6:2,S7:0,S8:0,DCI:0},
+  ARE: {S1:0,S2:3,S3:3,S4:3,S5:0,S6:3,S7:0,S8:0,DCI:0},   // RomeFlex baseline
+  FXG: {S1:0,S2:2,S3:0,S4:2,S5:2,S6:2,S7:0,S8:2,DCI:0},
+  PVF: {S1:0,S2:2,S3:2,S4:2,S5:2,S6:2,S7:0,S8:0,DCI:0},
+  EHD: {S1:2,S2:2,S3:2,S4:2,S5:2,S6:0,S7:0,S8:0,DCI:2},
+  OTLL:{S1:3,S2:3,S3:3,S4:3,S5:0,S6:3,S7:0,S8:0,DCI:3},   // SmarThor baseline
+  HIE: {S1:0,S2:2,S3:0,S4:2,S5:2,S6:2,S7:0,S8:0,DCI:2},
+  INT: {S1:2,S2:2,S3:2,S4:0,S5:0,S6:2,S7:0,S8:2,DCI:0},
+  AIG: {S1:0,S2:2,S3:0,S4:2,S5:2,S6:2,S7:0,S8:0,DCI:0},
+  PEG: {S1:2,S2:2,S3:0,S4:0,S5:0,S6:2,S7:0,S8:0,DCI:0},
+  SCD: {S1:0,S2:2,S3:0,S4:0,S5:2,S6:0,S7:2,S8:2,DCI:0},
+};
+
+// Cross-border / cross-pilot test pairs. Strength: 3 strong, 2 medium, 1 weak.
+// Each entry justified from D4.1 evidence. Pairs are symmetric (we render once, mirror in matrix).
+const CROSSBORDER = [
+  // EC_Scale cluster — strongest cross-pilot validation
+  {a:"ECF", b:"ECP", s:3, why:"Both EC_Scale pilots. PT explicitly designed for cross-pilot interoperability of RECreation; FR uses common CESU procedures."},
+  {a:"ECF", b:"ECS", s:3, why:"EC_Scale cluster — both validate CESU/onboarding procedures across MS. §3.1 narrative."},
+  {a:"ECF", b:"ECA", s:3, why:"EC_Scale cluster — AT designed for 'scaling and interoperability across multiple countries' (§3.7.3)."},
+  {a:"ECP", b:"ECS", s:3, why:"EC_Scale cluster — common reference framework for ECs from T4.3."},
+  {a:"ECP", b:"ECA", s:3, why:"EC_Scale cluster — RECreation usable cross-pilot; AT tests multi-DSO onboarding via CEEDS."},
+  {a:"ECS", b:"ECA", s:3, why:"EC_Scale cluster — both test CESU procedures, though ES focuses on national Datadis."},
+
+  // Customer apps share T4.2 reference model
+  {a:"SF",  b:"EC",  s:3, why:"Both T4.2 customer apps. Share Common European Reference Framework (CERF) and metering/consumption data access procedures."},
+
+  // EC_Scale ↔ Customer apps via T4.2 procedures
+  {a:"EC",  b:"ECP", s:2, why:"ECLIPSE implements CERF; PT RECreation aligns with the Common Reference Model for ECs."},
+  {a:"SF",  b:"ECP", s:2, why:"Both retrieve metering data; PT pilot exchanges aggregated household datasets."},
+
+  // Flexibility cluster — Market-Edge architecture from D4E
+  {a:"ECF", b:"ARE", s:2, why:"Both deal with FCAs / flexibility programs (Market-Edge architecture from D4E)."},
+  {a:"ECF", b:"FXG", s:2, why:"Flexibility programs share T4.4 reference models for FCAs and demand response."},
+  {a:"ECF", b:"PVF", s:2, why:"Both T4.4 flexibility; common FCA procedures."},
+  {a:"ECF", b:"JEN", s:2, why:"Both T4.4 flexibility orchestration."},
+  {a:"ECF", b:"CLL", s:2, why:"Both T4.4 — flexibility from connected DERs."},
+  {a:"FXG", b:"PVF", s:2, why:"Both T4.4 flexibility deployments — common reference model."},
+  {a:"FXG", b:"JEN", s:2, why:"Both T4.4 flexibility — share data formats."},
+  {a:"PVF", b:"JEN", s:2, why:"Both T4.4 flexibility orchestration."},
+  {a:"FXG", b:"CLL", s:2, why:"Both DSO-led flexibility living labs."},
+  {a:"PVF", b:"CLL", s:2, why:"Both T4.4 — DER integration patterns."},
+
+  // Intra-AT (same DSO)
+  {a:"FXG", b:"AIG", s:3, why:"AIGridOpt is explicitly the intelligence layer on top of flexgrid (§3.19.1). Same DSO (Energienetze Steiermark), digital-twin/shadow integration."},
+
+  // E-mobility cluster — T4.5
+  {a:"EHD", b:"OTLL",s:3, why:"Both T4.5 smart charging. Aggregated/standardised data for comparison and replication across MS."},
+
+  // SP-Dataspace Connection Adapter — connects to many SPs
+  {a:"SPD", b:"ECF", s:2, why:"Adapter enables SPs to connect to CEEDS — relevant to any flexibility/EC procedure."},
+  {a:"SPD", b:"JEN", s:2, why:"Adapter underpins SP onboarding for flexibility orchestration."},
+  {a:"SPD", b:"FXG", s:2, why:"Adapter underpins SP onboarding for flexibility orchestration."},
+
+  // Sector coupling — T4.7/T4.8
+  {a:"SCD", b:"PEG", s:2, why:"Both sector-coupling deployments — SCDI for general multi-vector, PEGNIPO for PT electricity/gas."},
+  {a:"SCD", b:"EHD", s:1, why:"Sector coupling includes transport — SCDI's vector framework relevant to e-mobility."},
+  {a:"SCD", b:"OTLL",s:1, why:"Sector coupling — energy-mobility vector overlap."},
+
+  // Customer apps ↔ ECLIPSE EC_Scale links
+  {a:"EC",  b:"ECA", s:1, why:"Weak — common CESU and final-customer procedures via CERF."},
+  {a:"EC",  b:"ECF", s:1, why:"Weak — common customer-facing procedures via T4.2/T4.3 overlap."},
+
+  // Metering Point Effectiveness — narrow, but data quality applies broadly
+  {a:"MPE", b:"FXG", s:1, why:"Weak — metering data quality underpins any DSO flexibility deployment."},
+  {a:"MPE", b:"AIG", s:1, why:"Weak — metering data quality required for AI training."},
+
+  // INTERFLEX — GR flexibility
+  {a:"INT", b:"FXG", s:1, why:"Weak — both flexibility deployments, common reference models."},
+  {a:"INT", b:"ECF", s:1, why:"Weak — common flexibility/CESU procedures."},
+
+  // Hierarchies — explicit no cross-border; only weak conceptual links
+  {a:"HIE", b:"AIG", s:1, why:"Weak — both AI/forecasting layers for grid operation, conceptual overlap only. Hierarchies explicitly requires no cross-border."},
+];
+
+const MILESTONES = [
+  {m:"M12", date:"Apr 2026", title:"D4.1 v1.0 (this report)", status:"done", x:12,
+    deliv:"D4.1 first version — requirements engineering progress, 11 reference models published, 20 deployments scoped, S1–S8 services aligned with D4E.",
+    pilots:"All deployments in preparation. Zero pilots in operation.",
+    policy:"Initial alignment with D4E expert group outputs; SIMPL Toolset & DSSC reference frameworks under evaluation."},
+  {m:"M18", date:"Oct 2026", title:"D4.1 v2.0 + D4.2", status:"current", x:18,
+    deliv:"D4.1 second iteration alongside D4.2 (sister deliverable). Meta-service architecture finalised in T2.2. First MIMs draft.",
+    pilots:"First pilots start operation. Deployment plans synchronised with CEEDS service development.",
+    policy:"Connections to other data-space initiatives designed. D4E governance recommendations integrated."},
+  {m:"M24", date:"Apr 2027", title:"D4.1 v3.0 (mid-project)", status:"future", x:24,
+    deliv:"Third iteration. Cross-border procedures validated. T2.3 MIM consolidation.",
+    pilots:"Majority of pilots in operation phase. First demonstration results.",
+    policy:"DG ENER Network Code on Demand Response procedures fully reflected. CEEDS Operational Entity governance proposal."},
+  {m:"M30", date:"Oct 2027", title:"D4.1 v4.0", status:"future", x:30,
+    deliv:"Penultimate iteration. KPIs evidenced from pilot operation. Marketplace (S8) selection finalised.",
+    pilots:"All pilots operational; cross-border demonstrations underway.",
+    policy:"Handover plan to CEEDS Operational Entity (post-2028)."},
+  {m:"M36", date:"Apr 2028", title:"D4.3 final + project close", status:"future", x:36,
+    deliv:"Final WP4 deliverable D4.3 (replaces further D4.1 updates). Full impact assessment.",
+    pilots:"Demonstrations complete. Sustainability handover.",
+    policy:"Full alignment with D4E final framework; CEEDS Operational Entity ready to take over."},
+];
+
+/* ===================== RENDER ===================== */
+
+// Timeline dots
+const axis = document.getElementById('timelineAxis');
+MILESTONES.forEach(ms=>{
+  const pct = (ms.x/36)*100;
+  const dot = document.createElement('div');
+  dot.className = 'ms-dot ' + ms.status;
+  dot.style.left = pct + '%';
+  dot.title = ms.title;
+  dot.addEventListener('click', ()=>renderMS(ms));
+  axis.appendChild(dot);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'ms-label';
+  lbl.style.left = pct + '%';
+  lbl.innerHTML = `<b>${ms.m}</b>${ms.title.replace(' (this report)','')}`;
+  axis.appendChild(lbl);
+
+  const dt = document.createElement('div');
+  dt.className = 'ms-date';
+  dt.style.left = pct + '%';
+  dt.textContent = ms.date;
+  axis.appendChild(dt);
+});
+function renderMS(ms){
+  const tagColor = ms.status==='done'?'var(--good)':ms.status==='current'?'var(--warn)':'var(--na)';
+  document.getElementById('msDetail').innerHTML = `
+    <h3>${ms.m} — ${ms.title} <span class="pill" style="border-color:${tagColor};color:${tagColor}">${ms.status.toUpperCase()}</span> · ${ms.date}</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div><div class="tag s" style="margin-bottom:6px">DELIVERABLES</div>${ms.deliv}</div>
+      <div><div class="tag s" style="margin-bottom:6px">PILOTS STATE</div>${ms.pilots}</div>
+      <div><div class="tag s" style="margin-bottom:6px">POLICY DEPENDENCIES</div>${ms.policy}</div>
+    </div>`;
+}
+// Auto-select M18 (current)
+renderMS(MILESTONES[1]);
+
+// Gantt
+function renderGantt(filter){
+  const g = document.getElementById('gantt');
+  // Header
+  let html = `<div class="gantt-header"><div>Deployment</div><div style="padding:0"><div class="gantt-q-header">`;
+  const quarters = ["25Q2","25Q3","25Q4","26Q1","26Q2","26Q3","26Q4","27Q1","27Q2","27Q3","27Q4","28Q1"];
+  quarters.forEach(q=>html+=`<div>${q}</div>`);
+  html += `</div></div></div>`;
+
+  DEPLOYMENTS.filter(d=>filter==='all'||d.cluster===filter).forEach(d=>{
+    html += `<div class="gantt-row">`;
+    html += `<div class="name" data-id="${d.id}"><span style="font-size:10px;color:var(--muted)">${d.task}</span> ${d.name}</div>`;
+    html += `<div class="track">`;
+    // grid columns
+    for(let i=0;i<12;i++) html += `<div class="qcol"></div>`;
+    d.phases.forEach(ph=>{
+      const left = ((ph.start-1)/12)*100;
+      const width = ((ph.end-ph.start+1)/12)*100;
+      const label = {prep:'Prep', dev:'Dev', pilot:'Pilot', demo:'Demo'}[ph.p];
+      html += `<div class="gantt-bar phase-${ph.p}" style="left:${left}%;width:${width}%">${label}</div>`;
+    });
+    html += `</div></div>`;
+  });
+  g.innerHTML = html;
+
+  // attach click handlers
+  g.querySelectorAll('.name').forEach(el=>{
+    el.addEventListener('click', ()=>renderDep(DEPLOYMENTS.find(x=>x.id===el.dataset.id)));
+  });
+}
+function renderDep(d){
+  const tags = d.services.map(s=>`<span class="tag s">${s}</span>`).join('');
+  document.getElementById('depDetail').innerHTML = `
+    <h3>${d.name} <span class="pill">${d.task}</span></h3>
+    <div style="color:var(--muted);font-size:11px;margin-bottom:6px">Partners: ${d.partners}</div>
+    <div class="tags">${tags || '<span class="tag">Services TBD</span>'}</div>
+    <div style="margin-bottom:6px">${d.desc}</div>
+    <div><b style="color:var(--accent2)">Cross-border:</b> ${d.cross}</div>`;
+}
+renderGantt('all');
+document.querySelectorAll('.tab[data-cluster]').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab[data-cluster]').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    renderGantt(t.dataset.cluster);
+  });
+});
+
+// Heatmap — supports 'maturity' (0-5) or 'binary' modes
+let HEAT_MODE = 'maturity';
+function renderHeat(){
+  const h = document.getElementById('heat');
+  let html = '<thead><tr><th></th>';
+  SERVICES.forEach(s=> html += `<th data-svc="${s.id}" style="cursor:pointer">${s.id}</th>`);
+  html += '</tr></thead><tbody>';
+  DEPLOYMENTS.forEach(d=>{
+    html += `<tr><td class="name">${d.name}</td>`;
+    SERVICES.forEach(s=>{
+      if(HEAT_MODE==='maturity'){
+        const score = (MATURITY[d.id]||{})[s.id] ?? 0;
+        html += `<td class="m${score}" data-svc="${s.id}" data-dep="${d.id}" data-score="${score}" title="${d.name} × ${s.id}: ${score}">${score}</td>`;
+      } else {
+        const has = d.services.includes(s.id);
+        html += `<td class="${has?'x':''}" data-svc="${s.id}" data-dep="${d.id}">${has?'●':''}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  h.innerHTML = html;
+  h.querySelectorAll('[data-svc]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const dep = el.dataset.dep;
+      if(dep) renderCell(dep, el.dataset.svc);
+      else renderSvc(el.dataset.svc);
+    });
+  });
+}
+function renderSvc(sid){
+  const s = SERVICES.find(x=>x.id===sid);
+  // Sort dependent deployments by maturity for that service (desc)
+  const scoredDeps = DEPLOYMENTS.map(d=>({d, score:(MATURITY[d.id]||{})[sid] ?? 0}))
+    .filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+  const tagsHtml = scoredDeps.map(x=>{
+    return `<span class="tag" style="background:linear-gradient(135deg, rgba(94,162,255,${0.15+0.15*x.score}), rgba(110,218,203,${0.1+0.1*x.score}));color:#e9eef8">${x.d.name} <b style="color:var(--accent2)">${x.score}</b></span>`;
+  }).join('');
+  const avg = scoredDeps.length ? (scoredDeps.reduce((a,x)=>a+x.score,0)/scoredDeps.length).toFixed(2) : '—';
+  document.getElementById('serviceDetail').innerHTML = `
+    <h3>${s.id} — ${s.name}</h3>
+    <div style="margin-bottom:8px">${s.desc}</div>
+    <div style="color:var(--muted);font-size:11px;margin-bottom:4px">Required by ${scoredDeps.length} of 20 deployments &middot; average maturity ${avg}/5:</div>
+    <div class="tags">${tagsHtml || '<span class="tag">No deployments require this service</span>'}</div>`;
+}
+function renderCell(depId, svcId){
+  const d = DEPLOYMENTS.find(x=>x.id===depId);
+  const s = SERVICES.find(x=>x.id===svcId);
+  const score = (MATURITY[depId]||{})[svcId] ?? 0;
+  const labels = ["Not in scope","Identified","Planned","In development","Integration testing","Pilot operational"];
+  document.getElementById('serviceDetail').innerHTML = `
+    <h3>${d.name} × ${s.id} — Maturity ${score}/5 (${labels[score]})</h3>
+    <div style="color:var(--muted);font-size:11px;margin-bottom:6px">Service: ${s.name}</div>
+    <div style="margin-bottom:8px">${s.desc}</div>
+    <div style="color:var(--muted);font-size:11px">Deployment context:</div>
+    <div>${d.desc}</div>`;
+}
+document.querySelectorAll('.tab[data-heatmode]').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab[data-heatmode]').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    HEAT_MODE = t.dataset.heatmode;
+    renderHeat();
+  });
+});
+renderHeat();
+
+// Cross-border matrix
+function renderXB(){
+  const tbl = document.getElementById('xbMatrix');
+  // Build lookup
+  const pair = {};
+  CROSSBORDER.forEach(p=>{
+    pair[p.a+'|'+p.b] = p; pair[p.b+'|'+p.a] = p;
+  });
+  // Header row (column ids)
+  let html = '<thead><tr><th class="rowhead"></th>';
+  DEPLOYMENTS.forEach(d=>{
+    html += `<th title="${d.name}">${d.id}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  // Rows
+  DEPLOYMENTS.forEach(da=>{
+    html += `<tr><th class="rowhead" title="${da.name}">${da.id} · ${da.name.length>22?da.name.slice(0,22)+'…':da.name}</th>`;
+    DEPLOYMENTS.forEach(db=>{
+      if(da.id===db.id){
+        html += `<td class="diag">·</td>`;
+      } else {
+        const p = pair[da.id+'|'+db.id];
+        if(!p) html += `<td data-a="${da.id}" data-b="${db.id}"></td>`;
+        else {
+          const cls = p.s===3?'xb-strong':p.s===2?'xb-med':'xb-weak';
+          const mark = p.s===3?'●':p.s===2?'◐':'·';
+          html += `<td class="${cls}" data-a="${da.id}" data-b="${db.id}" title="${da.name} ↔ ${db.name}">${mark}</td>`;
+        }
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  tbl.innerHTML = html;
+  tbl.querySelectorAll('[data-a]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const da = DEPLOYMENTS.find(x=>x.id===el.dataset.a);
+      const db = DEPLOYMENTS.find(x=>x.id===el.dataset.b);
+      const p = pair[el.dataset.a+'|'+el.dataset.b];
+      const sharedSvcs = SERVICES.filter(s=> da.services.includes(s.id) && db.services.includes(s.id));
+      const sharedTags = sharedSvcs.map(s=>`<span class="tag s">${s.id}</span>`).join('');
+      if(p){
+        const strength = p.s===3?'<span style="color:var(--good)">STRONG</span>': p.s===2?'<span style="color:var(--accent)">MEDIUM</span>':'<span style="color:var(--muted)">WEAK</span>';
+        document.getElementById('xbDetail').innerHTML = `
+          <h3>${da.name} ↔ ${db.name}</h3>
+          <div style="margin-bottom:6px"><b>Pair strength:</b> ${strength}</div>
+          <div style="margin-bottom:10px"><b>Rationale:</b> ${p.why}</div>
+          <div style="color:var(--muted);font-size:11px;margin-bottom:4px">Shared CEEDS services (potential exchange surface):</div>
+          <div class="tags">${sharedTags||'<span class="tag">No shared services in D4.1 Table 1</span>'}</div>`;
+      } else {
+        document.getElementById('xbDetail').innerHTML = `
+          <h3>${da.name} ↔ ${db.name}</h3>
+          <div style="margin-bottom:10px;color:var(--muted)">No cross-pilot exchange identified in D4.1. Shared services below would be the natural surface if such a test were added.</div>
+          <div class="tags">${sharedTags||'<span class="tag">No overlap in CEEDS services</span>'}</div>`;
+      }
+    });
+  });
+}
+renderXB();
+
+/* ===================== OBJECTIVES / EO / USE CASES (Grant Agreement) ===================== */
+
+const OBJECTIVES = [
+  {code:"I-OB-1", title:"Broaden access to data for innovative energy services", wps:"WP2:T2.1-6 · WP3:T3.1-5 · WP4:T4.2-8"},
+  {code:"I-OB-2", title:"Secure data space with standardised interoperability", wps:"WP2:T2.2,T2.5,T2.6 · WP3:T3.1-5 · WP4:T4.3"},
+  {code:"I-OB-3", title:"Governance system aligned with business models", wps:"WP1:T1.2 · WP2:T2.3-5 · WP5:T5.3,T5.5-8"},
+  {code:"I-OB-4", title:"Financially sustainable energy data space", wps:"WP3:T3.5 · WP5:T5.1-8"},
+  {code:"I-OB-5", title:"Linked to sector-specific data spaces & initiatives", wps:"WP2:T2.1-5 · WP3:T3.1-5 · WP4:T4.2-7"},
+  {code:"I-OB-6", title:"Contributes to use cases cross-border", wps:"WP3:T3.1-5 · WP4:T4.2-5"},
+];
+
+const EOS = [
+  {code:"EO1", title:"Technical infrastructure for CEEDS covering building blocks & use cases", where:"WP3 + WP4", risk:"on track"},
+  {code:"EO2", title:"Business models for maintenance & upscaling beyond project lifetime", where:"WP5 T5.2, T5.4", risk:"highest risk — see Sustainability section"},
+  {code:"EO3", title:"Governance system for CEEDS", where:"WP2 + WP5 T5.5-8", risk:"on track — DGEC established"},
+  {code:"EO4", title:"Bi-annual reports on connections to local/national/EU/sectoral data spaces", where:"WP2 + WP3 T3.1-4, T4.1", risk:"D4.1 = first such report; cadence locked"},
+  {code:"EO5", title:"Guidance/training documents to involve stakeholders in data sharing", where:"WP6 T6.2, WP5", risk:"D6.1 (M3) done"},
+  {code:"EO6", title:"Once operational, regular reports on usage data & maintenance", where:"WP3 T3.1, WP5 T5.2, T5.4", risk:"requires pilots live → starts M18"},
+];
+
+const USECASES = [
+  {code:"I-UC-1", name:"Energy Efficiency & Flexibility Management", task:"T4.2"},
+  {code:"I-UC-2", name:"Collective Self-Consumption & Flexible Connection Agreements", task:"T4.3, T4.4"},
+  {code:"I-UC-3", name:"Grid Flexibility Services", task:"T4.4"},
+  {code:"I-UC-4", name:"Electromobility (residential charging, EV infrastructure)", task:"T4.5"},
+  {code:"I-UC-5", name:"Renewables Integration", task:"T4.6"},
+  {code:"I-UC-6", name:"Networks and Integration Planning", task:"T4.7"},
+  {code:"I-UC-7", name:"Smart Sector Integration", task:"T4.8"},
+];
+
+// Pilot × Use Case coverage. 2 = primary validation, 1 = secondary contribution, 0 = not in scope.
+// Mapping from D4.1 §3.x descriptions + GA use-case-to-task assignment.
+const UC_COVERAGE = {
+  SF:  {"I-UC-1":2,"I-UC-2":0,"I-UC-3":0,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  EC:  {"I-UC-1":2,"I-UC-2":1,"I-UC-3":0,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  ECF: {"I-UC-1":1,"I-UC-2":2,"I-UC-3":2,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  ECP: {"I-UC-1":0,"I-UC-2":2,"I-UC-3":1,"I-UC-4":0,"I-UC-5":1,"I-UC-6":0,"I-UC-7":0},
+  ECS: {"I-UC-1":0,"I-UC-2":2,"I-UC-3":0,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  ECA: {"I-UC-1":0,"I-UC-2":2,"I-UC-3":0,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  CLL: {"I-UC-1":0,"I-UC-2":1,"I-UC-3":2,"I-UC-4":0,"I-UC-5":1,"I-UC-6":0,"I-UC-7":0},
+  JEN: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":2,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  SPD: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":2,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  MPE: {"I-UC-1":1,"I-UC-2":0,"I-UC-3":1,"I-UC-4":0,"I-UC-5":0,"I-UC-6":2,"I-UC-7":0},
+  ARE: {"I-UC-1":0,"I-UC-2":1,"I-UC-3":2,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  FXG: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":2,"I-UC-4":0,"I-UC-5":0,"I-UC-6":1,"I-UC-7":0},
+  PVF: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":2,"I-UC-4":0,"I-UC-5":1,"I-UC-6":0,"I-UC-7":0},
+  EHD: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":0,"I-UC-4":2,"I-UC-5":0,"I-UC-6":0,"I-UC-7":1},
+  OTLL:{"I-UC-1":0,"I-UC-2":0,"I-UC-3":1,"I-UC-4":2,"I-UC-5":0,"I-UC-6":0,"I-UC-7":1},
+  HIE: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":0,"I-UC-4":0,"I-UC-5":2,"I-UC-6":1,"I-UC-7":0},
+  INT: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":2,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":0},
+  AIG: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":2,"I-UC-4":0,"I-UC-5":0,"I-UC-6":2,"I-UC-7":0},
+  PEG: {"I-UC-1":0,"I-UC-2":1,"I-UC-3":0,"I-UC-4":0,"I-UC-5":1,"I-UC-6":2,"I-UC-7":2},
+  SCD: {"I-UC-1":0,"I-UC-2":0,"I-UC-3":0,"I-UC-4":0,"I-UC-5":0,"I-UC-6":0,"I-UC-7":2},
+};
+
+function renderObjTab(tab){
+  const grid = document.getElementById('objGrid');
+  let html = '';
+  if(tab==='iob'){
+    OBJECTIVES.forEach(o=>{
+      html += `<div class="obj"><div class="ocode">${o.code}</div><h4>${o.title}</h4><div style="color:var(--muted);font-size:11px">Related: ${o.wps}</div></div>`;
+    });
+  } else if(tab==='eo'){
+    EOS.forEach(o=>{
+      const riskColor = o.risk.includes('highest')?'var(--bad)':o.risk.includes('requires')?'var(--warn)':'var(--good)';
+      html += `<div class="obj eo"><div class="ocode">${o.code}</div><h4>${o.title}</h4><div style="color:var(--muted);font-size:11px;margin-bottom:6px">Achieved through: ${o.where}</div><div style="font-size:11px;color:${riskColor}"><b>Status:</b> ${o.risk}</div></div>`;
+    });
+  } else {
+    USECASES.forEach(o=>{
+      const pilots = DEPLOYMENTS.filter(d=>(UC_COVERAGE[d.id]||{})[o.code]>0).length;
+      html += `<div class="obj uc"><div class="ocode">${o.code}</div><h4>${o.name}</h4><div style="color:var(--muted);font-size:11px;margin-bottom:6px">Task: ${o.task}</div><div style="font-size:11px"><b>${pilots} pilots</b> validate this</div></div>`;
+    });
+  }
+  grid.innerHTML = html;
+}
+document.querySelectorAll('.tab[data-objtab]').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab[data-objtab]').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    renderObjTab(t.dataset.objtab);
+  });
+});
+renderObjTab('iob');
+
+// Use Case heatmap
+function renderUC(){
+  const h = document.getElementById('ucHeat');
+  let html = '<thead><tr><th></th>';
+  USECASES.forEach(u=> html += `<th data-uc="${u.code}" style="cursor:pointer" title="${u.name}">${u.code}</th>`);
+  html += '</tr></thead><tbody>';
+  DEPLOYMENTS.forEach(d=>{
+    html += `<tr><td class="name">${d.name}</td>`;
+    USECASES.forEach(u=>{
+      const v = (UC_COVERAGE[d.id]||{})[u.code] ?? 0;
+      const cls = v===2?'m5':v===1?'m1':'m0';
+      const ch = v===2?'●':v===1?'◐':'';
+      html += `<td class="${cls}" data-uc="${u.code}" data-dep="${d.id}">${ch}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  h.innerHTML = html;
+  h.querySelectorAll('[data-uc]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const uc = USECASES.find(x=>x.code===el.dataset.uc);
+      const primary = DEPLOYMENTS.filter(d=>(UC_COVERAGE[d.id]||{})[uc.code]===2);
+      const secondary = DEPLOYMENTS.filter(d=>(UC_COVERAGE[d.id]||{})[uc.code]===1);
+      document.getElementById('ucDetail').innerHTML = `
+        <h3>${uc.code} — ${uc.name}</h3>
+        <div style="color:var(--muted);font-size:11px;margin-bottom:8px">Lead task: ${uc.task}</div>
+        <div style="margin-bottom:6px"><b style="color:var(--good)">Primary (${primary.length}):</b> ${primary.map(p=>p.name).join(', ') || '—'}</div>
+        <div><b style="color:var(--accent)">Secondary (${secondary.length}):</b> ${secondary.map(p=>p.name).join(', ') || '—'}</div>`;
+    });
+  });
+}
+renderUC();
+
+/* ===================== RISK REGISTER ===================== */
+
+const RISKS = [
+  {n:1, desc:"Conflicts within the consortium", wp:"WP1-6", imp:"low", lik:"low", rag:"grn", note:"Consortium Agreement (CA) in place; EB governance active."},
+  {n:2, desc:"Delays and administrative problems", wp:"WP1", imp:"low", lik:"low", rag:"grn", note:"D4.1 already shifted M6→M12 by amendment — flagged."},
+  {n:3, desc:"Misalignments / inconsistencies in data space architecture", wp:"WP2", imp:"high", lik:"medium", rag:"amb", note:"T2.2 architecture finalisation due M18 — drift between WP3 dev and WP4 deployments is the standing project risk."},
+  {n:4, desc:"Security & privacy problems in CEEDS components & deployments", wp:"WP2,3,4", imp:"high", lik:"medium", rag:"amb", note:"DGEC established; T2.6 dedicated. eIDAS + GDPR alignment required."},
+  {n:5, desc:"Interoperability / connectivity between platforms or components", wp:"WP3", imp:"medium", lik:"medium", rag:"amb", note:"S6 (EITS) conformance testing will mitigate — but EITS itself is in design."},
+  {n:6, desc:"Consortium size causing manageability issues", wp:"WP1-6", imp:"medium", lik:"medium", rag:"grn", note:"Deployment leads coordinate smaller partners; tiered control structure."},
+  {n:7, desc:"Stakeholders unwilling to pay for facilitation services (sustainability)", wp:"WP3,5", imp:"low (per GA)", lik:"low (per GA)", rag:"amb", note:"TNO Vector evidence (Feb 2026) suggests this is materially under-rated — 85% of data spaces face this gap. Recommend re-scoring to 'medium/medium'."},
+  {n:8, desc:"ACER / EC fundamentally change Network Code Demand Response", wp:"WP2-4", imp:"medium", lik:"low", rag:"grn", note:"33 procedures in T4-4_02 would need rework. Monitor ENTSO-E + EU-DSO outputs."},
+];
+
+function renderRisks(){
+  const t = document.getElementById('riskTbl');
+  let html = '<thead><tr><th>#</th><th>Risk</th><th>WP</th><th>Impact</th><th>Likelihood</th><th>M14 RAG</th><th>Note</th></tr></thead><tbody>';
+  RISKS.forEach(r=>{
+    html += `<tr><td><b>${r.n}</b></td><td>${r.desc}</td><td><span class="otag">${r.wp}</span></td><td>${r.imp}</td><td>${r.lik}</td><td><span class="rag ${r.rag}">${r.rag==='red'?'RED':r.rag==='amb'?'AMBER':'GREEN'}</span></td><td style="color:var(--muted);font-size:11px">${r.note}</td></tr>`;
+  });
+  html += '</tbody>';
+  t.innerHTML = html;
+}
+renderRisks();
+
+/* ===================== PROJECT-LEVEL KPIs (Grant Agreement Table 1) ===================== */
+// 11 KPIs from GA Table 1, each linked to one or more I-OBs and to pilots that contribute evidence.
+
+const PROJECT_KPIS = [
+  { id:"PK1", desc:"Cross-MS solutions based on CEEDS deployed",
+    target:"15+ solutions in 10+ MSs",
+    objs:["I-OB-1","I-OB-6","I-OB-4"],
+    pilots:["SF","EC","ECF","ECP","ECS","ECA","CLL","JEN","SPD","ARE","FXG","PVF","EHD","OTLL","HIE","INT","AIG","PEG","SCD","MPE"],
+    note:"Demanding: 15+ solutions in 10+ MSs. INSIEME has 20 deployments — but most pilots are single-country at M14. Multi-MS expansion is the gap." },
+  { id:"PK2", desc:"EU-Level Data Spaces connected via CEEDS registry & semantic hubs",
+    target:"4+ EU-Level Data Spaces connected",
+    objs:["I-OB-1","I-OB-5","I-OB-2"],
+    pilots:["ECF","ECP","SPD","SCD"],
+    note:"Candidates: Enershare, Green.Dat.AI, Hedge.IoT (INESC TEC); Digital4Grids; Eddie; DATA CELLAR (CUERVA); SYNERGIES (Suite5)." },
+  { id:"PK3", desc:"National-level data exchange infrastructures covered by CEEDS",
+    target:"15+ national-level data-exchange infrastructures",
+    objs:["I-OB-2","I-OB-3","I-OB-5"],
+    pilots:["SF","ECF","ECP","ECS","ECA","SPD","ARE","OTLL"],
+    note:"Examples in D4.1: Datadis (ES), Estonian energy data hub, ENEDIS national DS, AT national DS (EDA), SmarThor (BE), RomeFlex (IT)." },
+  { id:"PK4", desc:"Energy Community solution providers operate in 2+ markets each",
+    target:"4+ EC providers in 2+ markets each",
+    objs:["I-OB-4","I-OB-1","I-OB-6"],
+    pilots:["ECF","ECP","ECS","ECA","EC"],
+    note:"GA names: BBO/ENI (AT→DE,ES), ELE (ES→PT), D4G (FR→AT,DK), OKE, ENG/SU5 (DATA CELLAR, SYNERGIES). At least 5 EC platform operators." },
+  { id:"PK5", desc:"Energy savings & cleantech companies operate in 2+ MSs each",
+    target:"4+ companies in 2+ MSs each",
+    objs:["I-OB-4","I-OB-1","I-OB-6"],
+    pilots:["SF","EC","JEN"],
+    note:"R8, ECLIPSE/ETRA, and others. CERF (Common European Reference Framework for energy-saving apps) is the harmonising layer." },
+  { id:"PK6", desc:"Flexible connection agreements deployed",
+    target:"3+ MSs",
+    objs:["I-OB-2","I-OB-6","I-OB-1"],
+    pilots:["ECF","ARE","FXG","PVF","CLL"],
+    note:"FCA reference model = 5 procedures (T4-4_01). FR (COMFLEX), IT (ARE/RomeFlex), AT (flexgrid, PVflex, Cuerva LL)." },
+  { id:"PK7", desc:"Connectivity with flexibility registers and market platforms via CEEDS",
+    target:"2+ MSs",
+    objs:["I-OB-5","I-OB-2","I-OB-1"],
+    pilots:["ECF","JEN","SPD","FXG","INT","AIG"],
+    note:"SP-Dataspace Connection Adapter is the cross-cutting deployment for this KPI." },
+  { id:"PK8", desc:"Cloud-edge systems deployed and operated in multiple MSs",
+    target:"4+ MSs (at least AT, ES, FR, IT)",
+    objs:["I-OB-2","I-OB-6","I-OB-1"],
+    pilots:["ECF","ECS","ECA","ARE","CLL","FXG","PVF","AIG","SPD"],
+    note:"The four target MSs are all covered by existing INSIEME pilots." },
+  { id:"PK9", desc:"Electromobility & smart charging solution providers, system operators and EV industry utilise CEEDS",
+    target:"2+ MSs (at least FR and SE)",
+    objs:["I-OB-1","I-OB-6","I-OB-5"],
+    pilots:["EHD","OTLL"],
+    note:"eHDMobility = SE (RISE, VOL, VEL, SCB, SWEA). OTLL = BE (VITO, ELIA). FR coverage needs explicit confirmation — gap?" },
+  { id:"PK10", desc:"Reference models for energy interoperability (analogous to CIR 2023/1162)",
+    target:"3+ reference models established + 5+ RFCs to IEC CIM / SAREF",
+    objs:["I-OB-2","I-OB-3","I-OB-5"],
+    pilots:["ECF","ECP","ECS","ECA","ARE","FXG","PVF"],
+    note:"M12 status: 11 reference models published on architecture.insieme.energy — already exceeds the 3+ target. RFC contributions to IEC CIM / SAREF still to materialise (T2.5)." },
+  { id:"PK11", desc:"Cross-sector data spaces with MIM-defined interoperability",
+    target:"Deployment in 2+ MSs (at least DK and BE) + 4+ MIM contributions",
+    objs:["I-OB-5","I-OB-3","I-OB-2"],
+    pilots:["HIE","OTLL","PEG","SCD"],
+    note:"DK covered via Hierarchies (DTU, Energinet, CDK). BE via OTLL SC (VITO, ELIA). MIM contributions tracked by T2.4." },
+];
+
+function renderProjectKPIs(){
+  const t = document.getElementById('pkpiTbl');
+  let html = '<thead><tr><th>#</th><th>KPI description</th><th>Target</th><th>I-OBs</th><th>Pilots</th></tr></thead><tbody>';
+  PROJECT_KPIS.forEach(k=>{
+    const objTags = k.objs.map(o=>`<span class="otag" style="color:var(--accent)">${o}</span>`).join(' ');
+    html += `<tr data-pk="${k.id}" style="cursor:pointer"><td><b>${k.id.replace('PK','')}</b></td><td>${k.desc}</td><td><b style="color:var(--accent2)">${k.target}</b></td><td>${objTags}</td><td>${k.pilots.length}</td></tr>`;
+  });
+  html += '</tbody>';
+  t.innerHTML = html;
+  t.querySelectorAll('[data-pk]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const k = PROJECT_KPIS.find(x=>x.id===el.dataset.pk);
+      const names = k.pilots.map(pid=>{
+        const d = DEPLOYMENTS.find(x=>x.id===pid);
+        return d ? d.name : pid;
+      });
+      const objTags = k.objs.map(o=>`<span class="tag s">${o}</span>`).join('');
+      document.getElementById('pkpiDetail').innerHTML = `
+        <h3>${k.id.replace('PK','KPI ')} — ${k.desc}</h3>
+        <div style="margin-bottom:6px"><b style="color:var(--accent2)">Target:</b> ${k.target}</div>
+        <div class="tags" style="margin-bottom:8px">${objTags}</div>
+        <div style="color:var(--muted);font-size:11px;margin-bottom:4px"><b style="color:var(--ink)">Note:</b> ${k.note}</div>
+        <div style="color:var(--muted);font-size:11px;margin-bottom:4px">Contributing pilots (${names.length}):</div>
+        <div class="tags">${names.map(n=>`<span class="tag">${n}</span>`).join('')}</div>`;
+    });
+  });
+}
+renderProjectKPIs();
+
+/* ===================== WP5 — Business Models & Sustainability (TNO full report) ===================== */
+// Source: TNO 2025 P12826 "Bridging the Financing Gap for Data Sharing Initiatives" (1 Dec 2025)
+// and TNO Vector article "Why many data space initiatives face a financing gap" (24 Feb 2026)
+
+/* ===================== WP5 — Business Models & Sustainability (TNO full report) ===================== */
+// Source: TNO 2025 P12826 "Bridging the Financing Gap for Data Sharing Initiatives" (1 Dec 2025, 46pp)
+// Authors: Kristiina Sau, Laura van den Aarssen, Gijs van Houwelingen, Marianne Schoenmakers (TNO Vector)
+// IMPORTANT LIMITATION NOTE (TNO §7): All three case studies are Dutch-only, cross-sectional snapshots.
+// The stepping-stones framework is retrospective — built by observing where cases are now, not by
+// tracking them through transitions in real time. None of the three cases has FULLY resolved the
+// transition to sustainable financing. The framework offers a way to think about navigation, not a guarantee.
+
+const TNO_INSIGHTS = [
+  {t:"Hybrid PPP models are likely a strategic necessity",
+   d:"'Adopting PPP-based governance- and finance model is not optional for Europe: it is likely a strategic necessity for scaling many, if not most, DSIs and safeguarding European data sovereignty.' (TNO §1 Executive Summary)"},
+  {t:"Balance is critical — governance and financing are interdependent",
+   d:"Stable governance structures underpin trust, monetisation, and sustained collaboration. Without neutral governance foundations, financing arrangements remain fragile and difficult to scale. (TNO §3.1.1)"},
+  {t:"Build focused coalitions before broadening participation",
+   d:"Early alignment on objectives, standards, and expectations helps prevent fragmentation, reduces coordination costs, and accelerates adoption once the initiative opens to wider groups. (TNO §3.1.1)"},
+  {t:"Develop tangible, quantified value propositions",
+   d:"When participants can clearly see how a DSI solves operational problems or reduces risk (e.g. reduced FCA admin burden, cross-MS market access), willingness-to-invest increases significantly. (TNO §3.1.2)"},
+  {t:"Tiered membership models reconcile inclusivity with sustainability",
+   d:"Allow SMEs to participate at lower cost while ensuring larger/more intensive users contribute proportionally to structural costs of technology, governance, and community-building. (TNO §3.1.2)"},
+  {t:"Sustainable financing is navigation, not a destination",
+   d:"'Sustainable financing is not a destination but an ongoing navigation. The finance gap and the governance knot do not resolve neatly. They require continuous attention to maintain legitimacy, balance competing interests, and adapt structures as ecosystems mature.' (TNO §6.7)"},
+];
+
+const TNO_CASES = [
+  { name:"Edu-V", sector:"Education (Netherlands)", model:"Long-term public investment",
+    funding:"9-year Growth Fund (multi-year public commitment)",
+    governance:"Foundation with balanced public-private governance; quality mark for ~200-250 IT suppliers; ACM partnership",
+    adoption:"Structured integration pathways for schools; supplier cohort onboarding",
+    challenge:"Transition from public dependence not yet resolved; questions remain about when participant co-funding will grow",
+    insight:"Public longevity reduces risk and attracts private commitment, but structural funding eventually needs diversification. Edu-V still depends heavily on public investment. (TNO §5.1, §7.1)",
+    relevance:"Closest analogue for a CEEDS Operational Entity post-2028. Argues for a 5–10 year successor investment instrument, not a cliff edge at M36.",
+    recs:[
+      {who:"Decision Makers", what:"Establish a governance structure that evolves as the data space grows. Begin with a small board of public sector and industry leaders."},
+      {who:"Participants", what:"Invest in developing connectors to the trust framework and commit to onboarding timelines rather than waiting for others to act first."},
+      {who:"Policy Makers", what:"Support long-term public investment and co-financing to reduce risk and signal permanence to suppliers. Promote interoperability with related frameworks."},
+    ]},
+  { name:"LIFES", sector:"Science / FAIR data (Netherlands)", model:"Participant-funded membership + service monetisation",
+    funding:"Mix of membership fees, in-kind contributions, and service revenue (€2,500 joining fee was barrier for SMEs)",
+    governance:"Non-profit association; strict vetting to prevent 'fairwashing'; 75% cash / 25% in-kind contributions",
+    adoption:"FAIR principles alignment; 'data-visiting' setup/management fees; compliance packages at €20,000",
+    challenge:"Price sensitivity; keeping benefits tangible enough to justify renewals; ongoing SME exclusion risk",
+    insight:"Participant-funded models can thrive if governance is neutral, benefits are tangible, and quality is policed through strict vetting. LIFES model is still being tested — service monetisation pathways only beginning. (TNO §5.2, §7.1)",
+    relevance:"Plausible model for CEEDS once 4+ Energy Community providers, 4+ cleantech companies, and 12 DSOs demonstrate willingness-to-pay. Strict vetting matters: prevent shell participation.",
+    recs:[
+      {who:"Decision Makers", what:"Develop 'win-win' value proposals for each participant type. Recognise in-kind contributions to support a diverse coalition and support less-funded institutes."},
+      {who:"Participants", what:"Encourage authentic participation and prevent superficial compliance. Align internal practices with CEEDS principles."},
+      {who:"Policy Makers", what:"Promote inclusive governance standards for DSIs. Encourage tiered membership and recognise alternative contributions (in-kind) to lower SME barriers."},
+    ]},
+  { name:"Zorgeloos Vastgoed", sector:"Real estate (Netherlands)", model:"Intermediary-led PPP",
+    funding:"4 founding orgs (HDN, NVM, KNB, Kadaster) co-finance; 50/50 public-private foundation",
+    governance:"Associations represent many small actors; board balances public interest and industry representation; governance neutrality through separation of assurance/operations",
+    adoption:"~74% of real estate transactions covered (NVM); mortgage data 100% (HDN); notaries (KNB). Mortgage process reduced from 6–8 weeks to near real-time.",
+    challenge:"Resistance to change; varying digitalisation levels among small offices; maintaining balance between large and small members; COVID complicated trust-building",
+    insight:"Intermediary-led PPPs are effective when sectors are fragmented and many small players must be onboarded efficiently. However, association-funded engagement risks being superficial if individual members do not feel directly invested. (TNO §5.3, §7.1)",
+    relevance:"STRONGEST analogue for energy: EDSO, ENTSO-E, EU DSO Entity, BRIDGE, EREF could co-finance CEEDS on behalf of their DSO/TSO/EC members. WP5 T5.6 (DSO round-table) and T5.7 (TSO round-table) are the natural channels.",
+    recs:[
+      {who:"Decision Makers", what:"Establish a robust governance model early and plan for permanence. Keep foundation management lightweight; leverage in-kind contributions. Communicate a clear, shared vision. Use software providers as strategic leverage for implementation."},
+      {who:"Participants", what:"Actively participate in working groups and share domain knowledge. Communicate internal benefits and prepare for future contribution obligations."},
+      {who:"Policy Makers", what:"Secure high-level political support and structural financing. Promote interoperability with related frameworks (e.g. DSGO equivalent in energy)."},
+    ]},
+];
+
+const TNO_STONES = [
+  {n:1, title:"Subsidies & seed grants",
+   desc:"Time-bound funding builds 'no-regret' assets: agreement and trust frameworks, participant onboarding flows, core standards and protocols. Creates space to convene an initial coalition without immediate pressure to extract fees, which is critical when trust is still forming.",
+   pattern:"Most common starting point. Works best when paired with clear exit criteria and used to derisk participation rather than indefinitely defer difficult trade-offs about who will pay.",
+   tension:"Grant dependency: operators may build more than they can sustain once funding ends, or defer hard decisions about cost-sharing. Some ecosystems scramble when grant cycles close with governance and adoption still too fragile to support cost recovery.",
+   where:"INSIEME now (M0–M36): Digital Europe Programme grant. This is where INSIEME currently stands. The grant should be used explicitly to build assets that survive beyond M36."},
+  {n:2, title:"Long-term public investment",
+   desc:"Multi-year public commitments signal permanence. Allow operators to professionalise program offices, develop quality marks and trust frameworks, and roadmap integration pathways with predictability. Suppliers and end-users are more likely to invest in adoption when they see sustained backing.",
+   pattern:"Best when paired with explicit expectations: supplier cohort onboarding targets, participant fee growth curves, or service monetisation offsets. Without these, risks becoming a permanent subsidy. Canonical case: Edu-V 9-year Growth Fund.",
+   tension:"Can crowd out private participation if it removes incentives for cost-sharing. Can lead to complacency if operators are not held to adoption or co-funding targets.",
+   where:"INSIEME target: secure a successor public investment instrument (D4E Operational Entity, Digital Europe successor programme, or national co-funding) before M30. Currently no such commitment exists."},
+  {n:3, title:"Public-private governance (load-bearing)",
+   desc:"'The stone that bears the weight of all others. Without neutral structures that balance public interest and private agility, other financing arrangements sink under legitimacy questions.' (TNO §6.1.3) Key principle: separate assurance functions (quality marks, standards) from operational/commercial activities.",
+   pattern:"Foundations with balanced boards, or associations with general assemblies and working groups channelling technical input into decision councils. Common governance challenge: power asymmetries do not disappear through documentation alone.",
+   tension:"Formal governance can slow innovation; even well-designed systems struggle to prevent drift. Transparency helps, but only if decision logs are consulted and appeals mechanisms are credible. Governance develops unevenly, often in parallel with financing transitions.",
+   where:"INSIEME: WP5 T5.3 (lead: EDSO, M10–M36) — Governance model for CEEDS Operational Entity. DGEC is operational. TNO finding: governance must develop in parallel with financing, not sequentially after."},
+  {n:4, title:"Intermediary funding",
+   desc:"Associations, trade bodies, and umbrella organisations pool resources to fund common infrastructure on behalf of many members. Reduces per-entity transaction costs; improves SME inclusion. Canonical case: Zorgeloos Vastgoed (HDN, NVM, KNB, Kadaster).",
+   pattern:"Works best in fragmented sectors where hundreds of small actors benefit from shared standards but cannot individually fund their development. Associations negotiate co-funding, rally software providers, maintain community management.",
+   tension:"Can obscure accountability — if associations fund on behalf of members, those members may not feel directly invested in governance or adoption. Larger members can dominate working groups. Renewal depends on the association's continued commitment, not on tangible value to individual participants.",
+   where:"INSIEME opportunity: EDSO (12 DSO members), EREF (renewables), ENERC (energy communities), EU DSO Entity, ENTSO-E subset. No formal intermediary-funded compact exists yet. This is the most direct analogue for INSIEME's WP5 sustainability path."},
+  {n:5, title:"Service monetisation",
+   desc:"Service fees link revenue to tangible activities: setup support, shared infrastructure management, certification and qualification, compliance. Aligns income with adoption — fees are paid when participants actually use the services. LIFES uses 'data-visiting' setup/management fees alongside membership.",
+   pattern:"Tends to work better once governance credibility is established and adoption is visible enough to generate demand. Early attempts to charge for unproven value can backfire and erode trust. Introduce fees gradually — start with low-friction services (onboarding support) before moving to higher-value activities (certification).",
+   tension:"Perceived bias: if the same entity that sets standards also delivers paid services, participants may question whether commercial interests are shaping governance. Separation of assurance from operations is critical but not always sufficient.",
+   where:"INSIEME natural revenue surfaces: S6 (EITS — interoperability testing and certification) and S8 (EDSM — Services Marketplace). Both currently in design phase under T2.2. EDSO is assigned lead for S6 (certification) — structural conflict-of-interest risk to monitor."},
+  {n:6, title:"Participant-funded membership",
+   desc:"Tiered membership fees create structural revenue and keep stakeholders invested in the ecosystem's success. In-kind contribution pathways (expertise, staff time, data, infrastructure) reduce barriers for smaller actors. Canonical case: LIFES (75% cash / 25% in-kind contributions).",
+   pattern:"Harder to implement early unless the community is cohesive and motivated by a shared problem. Works best once governance maturity is demonstrated and adoption is visible enough to justify the investment. Membership often appears later in the sequence, after subsidies have derisked participation.",
+   tension:"Price sensitivity varies widely. Membership risks becoming transactional if benefits are not tangible or governance feels closed. High initial sign-ups followed by declining renewals is a known failure mode. Assessing participant maturity before admitting members is important.",
+   where:"INSIEME long-term goal — realistically from M30+ once value is demonstrated through operational pilots. Tiered model: large utilities (APG, REN, Enedis, EDA) pay full; 18 tech providers pay proportional; 10 R&I institutions contribute in-kind."},
+];
+
+const TNO_ROUTES = [
+  {name:"Route A — Public-led",
+   logic:"Public authorities anchor a neutral framework; suppliers are too fragmented to coordinate funding on their own.",
+   seq:"Subsidies → Long-term public investment → Governance formalises → Membership and service fees grow as adoption increases.",
+   challenge:"Avoid prolonged dependence. Set explicit co-funding targets and adoption milestones to prevent public investment from becoming a permanent subsidy.",
+   case:"Edu-V",
+   insieme:"Applicable if DG ENER / HaDEA commit to a multi-year successor instrument. Currently not secured."},
+  {name:"Route B — Association-led",
+   logic:"Strong existing associations represent many small actors; sector fragmentation is high; transaction costs prohibit direct individual participation.",
+   seq:"Subsidies → Intermediary funding (associations pool resources) → Governance through association structures → Service fees as value is proven → Membership tiers as adoption widens.",
+   challenge:"Association interests may diverge from ecosystem needs. Representation imbalances can allow larger members to dominate. Maintain neutrality and transparency in procurement and pricing.",
+   case:"Zorgeloos Vastgoed",
+   insieme:"STRONGEST match for INSIEME. EDSO, EU DSO Entity, ENTSO-E, BRIDGE, EREF are the natural intermediaries. WP5 T5.6/T5.7 round-tables are the activation mechanism."},
+  {name:"Route C — Community-led",
+   logic:"A motivated group of early adopters can contribute in-kind and pay modest fees without public support. Governance formalises early to prevent insider capture.",
+   seq:"Membership fees and in-kind contributions from Day 1 → Governance formalises early → Services grow → Public co-funding arrives later to strengthen reach and inclusion.",
+   challenge:"Inclusion risk: community-led starts can be elite or insider-driven. Broader participation may require public backing to reduce barriers for SMEs and less-resourced actors.",
+   case:"LIFES",
+   insieme:"Possible but requires the 20 pilot operators to commit membership-level resources before M36. Currently no such commitment. Would depend on demonstrated willingness-to-pay from T4 pilots."},
+];
+
+const TNO_READINESS = [
+  {stone:"Subsidies & seed grants",
+   fin:"Core shared assets funded; budget runway defined",
+   gov:"Roles and working groups defined; charter drafted",
+   adopt:"Integrations live; initial onboarding flows tested",
+   trans:"'No-regret' assets (trust frameworks, standards, onboarding flows) in place; exit criteria for grant dependency defined"},
+  {stone:"Long-term public investment",
+   fin:"Multi-year commitment signalled by public authority; co-funding targets set",
+   gov:"Council cadence and reporting established; governance body recognised externally",
+   adopt:"Assurance mechanisms recognised by users; multiple supplier cohorts onboarded",
+   trans:"Multiple supplier cohorts onboarded; participant revenue growth curve agreed"},
+  {stone:"Intermediary funding",
+   fin:"Umbrella co-funding arrangements agreed; associations committed to cost-sharing",
+   gov:"Balanced governance seats across actor sizes; SME representation mechanisms active",
+   adopt:"SME onboarding via umbrella channels improving; long-tail coverage growing",
+   trans:"Long-tail coverage improving; association funding formally committed for ≥2 years"},
+  {stone:"PPP governance",
+   fin:"Neutral legal entity active; co-funding terms documented",
+   gov:"Decisions logged and publicly accessible; transparency mechanisms credible",
+   adopt:"Cross-ecosystem reuse emerging; external frameworks aligning or partnering",
+   trans:"External frameworks aligned or partnering; governance entity legally independent"},
+  {stone:"Service monetisation",
+   fin:"Service catalogue published; pricing transparent and fair",
+   gov:"Assurance vs. operations formally separated; independent oversight of quality marks",
+   adopt:"Service uptake measurable; demand visible and growing",
+   trans:"Service fees contributing materially to operational costs"},
+  {stone:"Participant-funded membership",
+   fin:"Tiers and benefits published; in-kind pathways documented",
+   gov:"Admission and voting rules clear; appeals mechanisms in place",
+   adopt:"Renewals and active engagement visible; benefits tangible enough to justify fees",
+   trans:"Membership runway supporting operations; passive/symbolic members identified and addressed"},
+];
+
+// Per case: recommendation tables from TNO (Tables 1, 2, 3)
+const TNO_PITFALLS = [
+  {n:1, title:"Grant dependency",
+   desc:"'Operators may build more than they can sustain once funding ends, or they may defer difficult decisions about who will pay for what.' Some ecosystems plan explicitly for the transition; others scramble when grant cycles close.",
+   guard:"Define a minimum asset set that should endure. Publish a roadmap for subsequent funding sources at M18 (i.e. what specifically needs to be operational before M36 to be self-sustaining). Pair grant use with explicit exit criteria.",
+   insieme:"HIGH RISK for INSIEME. M36 is 24 months away. No successor instrument has been committed to."},
+  {n:2, title:"Governance drift",
+   desc:"'Power asymmetries reassert themselves despite formal structures. Larger participants often have more resources to engage in working groups, and their voices can dominate even in formally balanced structures.' (TNO §6.5)",
+   guard:"Regular reviews of governance arrangements; credible appeals mechanisms; transparency of decision logs. INSIEME's DGEC and EB governance structure provides the skeleton — it needs active maintenance.",
+   insieme:"MEDIUM RISK. 54 partners includes very asymmetric actors (APG, REN vs. small EC platform operators). T5.3 governance design should explicitly address power balance."},
+  {n:3, title:"Membership fatigue",
+   desc:"'Participants do not see tangible benefits from their fees or in-kind contributions.' High initial sign-ups followed by declining renewals. Recognising in-kind contributions can broaden participation but complicates governance weighting. (TNO §6.5)",
+   guard:"Communicate benefits clearly and adjust offerings based on feedback. Make benefits operational (reduced admin, faster onboarding) not promotional. Toolkits, events, and visible output matter.",
+   insieme:"MEDIUM RISK if CEEDS Operational Entity launches without clear per-participant value. WP5 T5.4 (business model development) must include a per-stakeholder-type value proposition table."},
+  {n:4, title:"Service backlash",
+   desc:"'Participants perceive that commercial interests are shaping governance decisions.' Separating assurance from operations is necessary but not always sufficient. Suspicions can linger if participants feel excluded from decision-making or see unaddressed conflicts of interest. (TNO §6.5)",
+   guard:"Transparent procurement, published pricing, independent oversight of quality marks/trust frameworks. For INSIEME: S6 (EITS) lead is EDSO — a structural conflict risk if EDSO is both operating the certification service and being certified.",
+   insieme:"MEDIUM-HIGH RISK. S6 lead assignment (EDSO) needs structural separation from the certification body function. Address in T2.2 service design."},
+  {n:5, title:"SME exclusion",
+   desc:"'Even in ecosystems designed to be inclusive, intermediaries and tiered membership models improve access but do not guarantee that small actors will engage or that their voices will be heard.' (TNO §6.5)",
+   guard:"Reduced-fee tiers, sponsorship mechanisms, in-kind pathways. Document fairness; invite input from underrepresented groups as ongoing tasks. INSIEME has 18 tech SME providers and many EC platform operators who need this.",
+   insieme:"HIGH RISK. 18 tech providers and small EC platform operators (BBO, ENI, ELE, OKE, D4G) could be priced out of the post-M36 CEEDS. T5.3 governance design must include SME pathways from the start."},
+];
+
+const TNO_RECS = {
+  ops: { audience:"For INSIEME WP5 leadership — DSI decision-makers and programme managers",
+    items: [
+      {t:"Establish governance early, design for 10-year continuity",
+       d:"'Decision-makers in DSIs should establish governance structures early and design them with long-term continuity in mind.' (TNO §3.1.1) T5.3 deliverable must produce a governance entity that can outlast the project by 5–10 years, not a report."},
+      {t:"Build a focused coalition first — not 54 partners equally",
+       d:"'Build coalitions of motivated and strategically aligned partners. Early alignment on objectives, standards, and expectations helps prevent fragmentation.' (TNO §3.1.1) Prioritise the 20 pilot operators and the 5 DSO/TSO associations in T5.6/T5.7."},
+      {t:"Develop per-stakeholder-type value propositions — quantified",
+       d:"'Develop tangible value propositions for both end users and suppliers, linked to concrete benefits such as reduced administrative burden, streamlined compliance, or improved data quality.' (TNO §3.1.2) DSOs: reduced FCA admin. ECs: scalable onboarding. Service providers: cross-MS market access."},
+      {t:"Implement tiered membership from design phase, not later",
+       d:"'Tiered membership models allow smaller organisations and SMEs to participate at lower cost while ensuring larger users contribute proportionally.' (TNO §3.1.2) Design this in T5.3 by M18, not as an afterthought at M30."},
+    ]},
+  partners: { audience:"For INSIEME's 54 partners — participants in working groups and users of the DSI",
+    items: [
+      {t:"Communicate concrete internal benefits to leadership",
+       d:"'Framing participation in terms of efficiency gains, improved compliance, or access to new data-driven services helps secure internal buy-in.' (TNO §3.2.1) Partners need to build internal business cases, not just project justifications."},
+      {t:"Contribute in-kind when budgets are constrained",
+       d:"'Expertise, staff time, data, or infrastructure can be critical for maintaining momentum in early phases and demonstrate commitment.' (TNO §3.2.1) Particularly relevant for 10 R&I institutions and 4 national DS operators."},
+      {t:"Engage actively — avoid symbolic membership",
+       d:"'Organisations are advised to avoid purely symbolic or \"token\" participation. Superficial engagement undermines credibility, slows progress, and weakens the ecosystem.' (TNO §3.2.2) The DGEC and WP working groups are the right fora."},
+    ]},
+  policy: { audience:"For policymakers — DG ENER, DG CNECT, HaDEA, D4E Expert Group",
+    items: [
+      {t:"Commit to structural long-term financing — not project grants",
+       d:"'Commit to structural, long-term financing arrangements that blend public and private investment, rather than relying solely on short-term project grants. Stable funding frameworks reduce risk for private actors and enable DSIs to invest in shared infrastructure and governance capacity.' (TNO §3.3.1) A Digital Europe successor for CEEDS must be decided before M30."},
+      {t:"Facilitate SME participation through targeted subsidies",
+       d:"'Ensuring that SMEs can participate meaningfully in DSIs is critical for diversity and innovation. Targeted subsidies, sponsorship schemes, or reduced-fee tiers can prevent smaller actors from being excluded.' (TNO §3.3.1)"},
+      {t:"Promote convergence and interoperability between trust frameworks",
+       d:"'Supporting harmonisation reduces duplication, lowers compliance costs, and allows data spaces in different sectors or countries to interconnect and scale more effectively.' (TNO §3.4) DSSC, SIMPL, and CEEDS governance entity must be aligned."},
+      {t:"Provide high-level political and institutional backing visibly",
+       d:"'Visible support from ministries, agencies, or EU bodies enhances credibility, signals policy stability, and can accelerate stakeholder buy-in across sectors.' (TNO §3.4) Endorsement from DG ENER + HaDEA should be part of the Operational Entity launch."},
+    ]},
+};
+
+const INSIEME_SELF_ASSESS = [
+  {dim:"Stone 1: Seed grants", status:"ACTIVE (M0–M36)", color:"good", note:"Digital Europe Programme grant running. 'No-regret' assets under construction: 11 RMs, DGEC, D4.1, D6.1."},
+  {dim:"Stone 2: Long-term public investment", status:"NOT SECURED", color:"bad", note:"No multi-year successor instrument committed. M36 funding cliff in 24 months. Critical gap."},
+  {dim:"Stone 3: PPP governance", status:"IN DESIGN (T5.3)", color:"warn", note:"DGEC established. CEEDS Governance Entity design in T5.3 (M10–M36, lead EDSO). Not yet operational as a legal entity."},
+  {dim:"Stone 4: Intermediary funding", status:"POTENTIAL (T5.6/T5.7)", color:"warn", note:"EDSO, EREF, ENERC, EU DSO Entity are natural intermediaries. No formal co-funding compact yet. DSO/TSO round-tables (T5.6, T5.7) are the activation mechanism."},
+  {dim:"Stone 5: Service monetisation", status:"IN DESIGN (T2.2)", color:"warn", note:"S6 (EITS certification) and S8 (EDSM marketplace) are the natural surfaces. Both in design. Conflict risk: S6 lead is EDSO — separation of assurance/operations must be addressed."},
+  {dim:"Stone 6: Participant membership", status:"NOT YET VIABLE", color:"bad", note:"Requires governance maturity + demonstrated willingness-to-pay. Earliest realistic: M30+. WTP evidence from pilots is the prerequisite."},
+  {dim:"Route B (Association-led)", status:"STRONGEST FIT", color:"good", note:"EDSO + EU DSO Entity + ENTSO-E + BRIDGE = 4 natural intermediaries. Zorgeloos Vastgoed analogue is highly applicable. This is INSIEME's most plausible path."},
+  {dim:"Risk #7 (GA): Stakeholders unwilling to pay", status:"UNDER-RATED", color:"bad", note:"GA rates this low/low. TNO evidence: 85%+ of data spaces face this exact problem. Recommend re-rate to medium/medium at next EB meeting. Requires formal EB sign-off."},
+  {dim:"EO2 commitment", status:"HIGHEST RISK EO", color:"bad", note:"Legal commitment to HaDEA. No concrete post-M36 financing mechanism committed. This is the gap that will determine whether INSIEME's CEEDS survives beyond 2028."},
+];
+
+function renderBMTab(tab){
+  const c = document.getElementById('bmContent');
+  if(tab==='overview'){
+    c.innerHTML =
+      `<div style="margin-bottom:12px;padding:10px 12px;background:rgba(239,91,107,.08);border:1px solid var(--bad);border-radius:8px;font-size:12px;line-height:1.6">
+        <b style="color:var(--bad)">Limitations (TNO §7):</b> The TNO report is based on three Dutch data spaces only (Edu-V, LIFES, Zorgeloos Vastgoed). The analysis is cross-sectional (a snapshot, not longitudinal tracking). <b>None of the three cases has fully resolved the transition to sustainable financing.</b> The stepping-stones framework was built retrospectively by observing where cases are now — it has not been tested as a planning tool. Apply to INSIEME with appropriate judgment.
+      </div>` +
+      `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">` +
+      TNO_INSIGHTS.map(i=>`
+        <div class="obj" style="border-left:4px solid var(--accent2)">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">${i.t}</h4>
+          <div style="color:var(--muted);font-size:12px;line-height:1.55">${i.d}</div>
+        </div>`).join('') + `</div>` +
+      `<div style="margin-top:12px;padding:10px 12px;background:var(--panel2);border-radius:8px;font-size:12px;color:var(--ink);line-height:1.55">
+        <b style="color:var(--accent)">Key numbers:</b> 85%+ of DSIs struggle to secure stable post-grant funding (TNO + open.overheid.nl data). Three Dutch cases studied. 46-page full report (1 Dec 2025). <b>Quote:</b> "Financing alone doesn't make a data space sustainable. It's the combination of governance maturity, tangible value, and shared commitment that keeps an ecosystem alive." — Gijs van Houwelingen, TNO Vector.
+      </div>`;
+  } else if(tab==='cases'){
+    c.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px">` +
+      TNO_CASES.map(k=>`
+        <div class="obj" style="border-left:4px solid var(--accent)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <h4 style="margin:0;font-size:14px;color:var(--ink)">${k.name}</h4>
+            <span class="otag" style="background:var(--accent)22;border-color:var(--accent);color:var(--accent)">${k.model}</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px"><b>Sector:</b> ${k.sector}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px"><b>Funding:</b> ${k.funding}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px"><b>Governance:</b> ${k.governance}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px"><b>Adoption:</b> ${k.adoption}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px"><b>Unresolved challenge:</b> ${k.challenge}</div>
+          <div style="font-size:11px;padding:5px 8px;background:rgba(94,162,255,.1);border-left:3px solid var(--accent);border-radius:3px;margin-bottom:6px;line-height:1.5"><b style="color:var(--accent)">Key insight (TNO):</b> ${k.insight}</div>
+          <div style="font-size:11px;padding:5px 8px;background:rgba(245,166,35,.1);border-left:3px solid var(--warn);border-radius:3px;margin-bottom:8px;line-height:1.5"><b style="color:var(--warn)">INSIEME relevance:</b> ${k.relevance}</div>
+          <div style="font-size:11px;color:var(--muted)"><b>Recommendation table (TNO Table ${k.name==='Edu-V'?'1':k.name==='LIFES'?'2':'3'}):</b></div>
+          <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
+            ${k.recs.map(r=>`<div style="font-size:10px;padding:4px 7px;background:var(--panel);border-radius:4px;line-height:1.4"><span style="color:var(--accent2);font-weight:600">${r.who}:</span> ${r.what}</div>`).join('')}
+          </div>
+        </div>`).join('') + `</div>`;
+  } else if(tab==='stones'){
+    c.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:8px">` +
+      TNO_STONES.map(s=>`
+        <div class="stone">
+          <div class="snum">${s.n}</div>
+          <h4>${s.title}</h4>
+          <div style="color:var(--muted);font-size:11px;margin-bottom:6px">${s.desc}</div>
+          <div style="font-size:10px;padding:4px 7px;background:rgba(94,162,255,.1);border-left:3px solid var(--accent);border-radius:3px;margin-bottom:4px;line-height:1.4"><b style="color:var(--accent)">Pattern:</b> ${s.pattern}</div>
+          <div style="font-size:10px;padding:4px 7px;background:rgba(239,91,107,.08);border-left:3px solid var(--bad);border-radius:3px;margin-bottom:4px;line-height:1.4"><b style="color:var(--bad)">Tension:</b> ${s.tension}</div>
+          <div class="where">INSIEME: ${s.where}</div>
+        </div>`).join('') + `</div>` +
+      `<div style="margin-top:12px;padding:10px 12px;background:rgba(110,218,203,.08);border:1px solid var(--accent2);border-radius:8px;font-size:12px;color:var(--ink);line-height:1.55">
+        <b style="color:var(--accent2)">Sequence is not interchangeable (TNO §6.2):</b> The stones have dependencies. Governance maturity enables membership and service monetisation — participants will not pay into systems they do not trust. Subsidies or intermediary funding derisk participation before membership is viable. Services work better after adoption is visible. The sequence depends on starting conditions: consortium cohesion, sector fragmentation, willingness of public authorities to provide long-term support.
+      </div>`;
+  } else if(tab==='routes'){
+    c.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">` +
+      TNO_ROUTES.map(r=>`
+        <div class="obj" style="border-left:4px solid var(--accent2)">
+          <h4 style="margin:0 0 6px 0;font-size:14px;color:var(--ink)">${r.name}</h4>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px"><b>Logic:</b> ${r.logic}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px"><b>Sequence:</b> ${r.seq}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px"><b>Challenge:</b> ${r.challenge}</div>
+          <div style="font-size:11px;padding:4px 7px;background:rgba(94,162,255,.1);border-left:3px solid var(--accent);border-radius:3px;margin-bottom:4px"><b style="color:var(--accent)">Case study:</b> ${r.case}</div>
+          <div style="font-size:11px;padding:4px 7px;background:rgba(245,166,35,.1);border-left:3px solid var(--warn);border-radius:3px"><b style="color:var(--warn)">INSIEME:</b> ${r.insieme}</div>
+        </div>`).join('') + `</div>`;
+  } else if(tab==='readiness'){
+    let html = '<div style="overflow-x:auto"><table class="risk-tbl" style="min-width:760px"><thead><tr><th>Stone</th><th>Financing readiness</th><th>Governance readiness</th><th>Adoption signals</th><th>Transition considerations</th></tr></thead><tbody>';
+    TNO_READINESS.forEach((r,i)=>{
+      html += `<tr><td><b>${i+1}. ${r.stone}</b></td><td style="font-size:11px;color:var(--muted)">${r.fin}</td><td style="font-size:11px;color:var(--muted)">${r.gov}</td><td style="font-size:11px;color:var(--muted)">${r.adopt}</td><td style="font-size:11px;color:var(--muted)">${r.trans}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    html += `<div style="margin-top:14px;padding:10px 12px;background:var(--panel2);border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--ink);line-height:1.55">
+      <b style="color:var(--accent2)">TNO Table 4 (§6.3) — readiness markers are signals, not bright lines.</b> Operators must interpret readiness in context, balancing financing, governance, and adoption signals. An ecosystem may show readiness in one dimension while lagging in another; transitions often begin before all signals are clear. "The goal is to avoid moving too early, which risks failure and erodes trust, or too late, which prolongs dependence and misses opportunities to compound momentum." (TNO §6.3)
+    </div>`;
+    c.innerHTML = html;
+  } else if(tab==='pitfalls'){
+    c.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">' +
+      TNO_PITFALLS.map(p=>`
+        <div class="obj" style="border-left:4px solid var(--bad)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="background:var(--bad);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${p.n}</span>
+            <h4 style="margin:0;color:var(--ink)">${p.title}</h4>
+          </div>
+          <div style="font-size:11px;color:var(--ink);margin-bottom:6px;line-height:1.55">${p.desc}</div>
+          <div style="font-size:11px;padding:5px 8px;background:rgba(62,207,142,.1);border-left:3px solid var(--good);border-radius:3px;margin-bottom:5px;line-height:1.4"><b style="color:var(--good)">Guard:</b> ${p.guard}</div>
+          <div style="font-size:10px;padding:4px 7px;background:rgba(245,166,35,.1);border-left:3px solid var(--warn);border-radius:3px;line-height:1.4"><b style="color:var(--warn)">INSIEME:</b> ${p.insieme}</div>
+        </div>`).join('') + '</div>' +
+      `<div style="margin-top:14px;padding:10px 12px;background:rgba(239,91,107,.06);border:1px solid var(--bad);border-radius:8px;font-size:12px;color:var(--ink);line-height:1.55">
+        <b style="color:var(--bad)">TNO §6.5:</b> "Sustainable financing is not only a matter of choosing the right stones or sequencing them well. It requires continuous governance work to manage tensions, adjust arrangements as adoption evolves, and maintain legitimacy among participants whose interests will never fully align."
+      </div>`;
+  } else if(tab==='recs'){
+    let html = '';
+    ['ops','partners','policy'].forEach(k=>{
+      const block = TNO_RECS[k];
+      html += `<div style="margin-bottom:16px">
+        <h3 style="margin:0 0 8px 0;color:var(--accent2);font-size:14px">${block.audience}</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
+          ${block.items.map(r=>`<div class="obj"><h4 style="margin:0 0 4px 0">${r.t}</h4><div style="color:var(--muted);font-size:12px;line-height:1.55">${r.d}</div></div>`).join('')}
+        </div>
+      </div>`;
+    });
+    c.innerHTML = html;
+  } else if(tab==='assess'){
+    let html = `<div style="margin-bottom:10px;padding:8px 10px;background:rgba(245,166,35,.08);border:1px solid var(--warn);border-radius:6px;font-size:11px;color:var(--ink);line-height:1.5">
+      <b style="color:var(--warn)">Self-assessment note:</b> This is an internal positioning of INSIEME against the TNO framework, not a validated external audit. The TNO framework itself carries important limitations (Dutch-only, cross-sectional, retrospective — see §7). Use for deliberation, not as a formal commitment.
+    </div>`;
+    html += '<table class="risk-tbl"><thead><tr><th>Dimension</th><th>M14 status</th><th>Note</th></tr></thead><tbody>';
+    INSIEME_SELF_ASSESS.forEach(a=>{
+      const colorMap = {good:"#3ecf8e",warn:"#f5a623",bad:"#ef5b6b",accent:"#5ea2ff"};
+      html += `<tr><td><b>${a.dim}</b></td><td><span class="rag" style="color:${colorMap[a.color]};border-color:${colorMap[a.color]};background:${colorMap[a.color]}22">${a.status}</span></td><td style="color:var(--muted);font-size:11px;line-height:1.5">${a.note}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    html += `<div style="margin-top:10px;padding:8px 10px;background:var(--panel);border-radius:6px;font-size:11px;color:var(--muted)">M14 positioning assessed against TNO success factors. Re-assess at every D4.1 milestone (M18, M24, M30, M36). EB sign-off recommended before public sharing.</div>`;
+    c.innerHTML = html;
+  }
+}
+document.querySelectorAll('.tab[data-bmtab]').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab[data-bmtab]').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    renderBMTab(t.dataset.bmtab);
+  });
+});
+renderBMTab('overview');
+
+/* ===================== GA-DEFINED KPIs / INDICATORS PER WORK PACKAGE ===================== */
+/* Provenance (important):
+   - WP1: explicit GA Table 4 (MI1–MI8 Management Indicators, 8 items)
+   - WP6: explicit GA Table 6 (KID-1 to KID-10, 14 items)
+   - WP2/3/4/5: indicators derived from GA task descriptions (§4 Work Plan) and EO commitments.
+     Not originally tabulated as "KPIs" in their own right. Real and traceable, but not canonical.
+     Recommendation: formalise these as WP-level KPIs in the D6.5 update at M18.
+   - Table 1 "Impact KPIs": these are project-level outcome KPIs, shown separately above. */
+
+const WP_KPIS = {
+  WP1: {
+    title: "WP1 — Management & Coordination",
+    note: "Lead: FHOOE. Source: Grant Agreement Table 4 — 8 Management Indicators (EXPLICIT GA KPIs). These are the only management-level KPIs formally defined in the Grant Agreement.",
+    items: [
+      {code:"MI1", v:"M3 ✓", l:"D1.1 Project Management Plan delivered. PMP will be updated until project end."},
+      {code:"MI2", v:"M6 + M12 ✓", l:"Refined use cases in M6 and deployments planned within their tasks by M12 (both PASSED)."},
+      {code:"MI3a", v:"M18", l:"CEEDS architecture and models defined — T2.2 deliverable. UPCOMING."},
+      {code:"MI3b", v:"M30", l:"CEEDS software components developed — WP3 gate. BIGGEST TECHNICAL MILESTONE."},
+      {code:"MI4", v:"M1 ✓", l:"Initiation of monitoring activities (PASSED)."},
+      {code:"MI5", v:"M36", l:"Closing of monitoring activities."},
+      {code:"MI6", v:"M3 ✓ → M36", l:"D6.1 Dissemination Action Plan (M3, PASSED). D6.2 report on dissemination activities (M18, updated M36)."},
+      {code:"MI7", v:"M18", l:"Interim Technical & Financial Report — EU periodic reporting & payments."},
+      {code:"MI8", v:"M36", l:"Final Technical & Financial Report."},
+    ],
+  },
+  WP2: {
+    title: "WP2 — Data Space Architecture & Governance",
+    note: "Lead: ALLA. Source: GA §4 WP2 task descriptions (T2.1–T2.6) and EO3 commitment. TASK-DERIVED indicators — not explicitly tabulated as KPIs in the GA.",
+    items: [
+      {code:"T2.1 D2.1", v:"M6 ✓", l:"Analysis of Existing Data Space Initiatives (FIT, Public, M6). Together with D4.1, marks MS3."},
+      {code:"T2.2 D2.2", v:"M18", l:"CEEDS Architecture — architecture, models, and ABBs. Triggers MI3a. Lead: FHOOE."},
+      {code:"T2.3 D2.3", v:"M18 → M36", l:"CEEDS Governance Model — updated bi-annually. Lead: FHOOE."},
+      {code:"T2.4 D2.4", v:"M18 → M36", l:"Common Reference Models & MIMs — alignment with IEC CIM, SAREF, HEMRM. Lead: ALLA."},
+      {code:"T2.5", v:"M4–M18", l:"Information Models & Standards alignment (semantic interoperability)."},
+      {code:"T2.6", v:"M1–M30", l:"Security & privacy governance. DGEC established M1. eIDAS + GDPR."},
+      {code:"Meta-services", v:"9 + DCI", l:"S1–S8 + Digital Customer Interface fully specified in D2.2 by M18."},
+      {code:"Standards RFCs", v:"≥5", l:"GA Table 1 KPI: ≥5 RFCs to IEC CIM / SAREF standards by M36."},
+      {code:"Reference models", v:"≥3", l:"GA Table 1 KPI: ≥3 reference models implemented in ≥3 MSs by M36."},
+    ],
+  },
+  WP3: {
+    title: "WP3 — Implementation of Core CEEDS Components",
+    note: "Lead: FHOOE. Source: GA §4 WP3 task descriptions (T3.1–T3.5) and the WP4 architecture diagram. TASK-DERIVED indicators. Critical gate: MI3b at M30.",
+    items: [
+      {code:"T3.1", v:"M4–M24", l:"Federation of existing energy data spaces (EDDIE framework, OneNet, national DS operators)."},
+      {code:"T3.2", v:"M4–M30", l:"Extend EU-level Data Spaces — connect to DSSC, SIMPL, GAIA-X."},
+      {code:"T3.3 D3.3", v:"M4–M30", l:"Connect cross-sectoral European DS (MIMs: electricity ↔ mobility ↔ buildings)."},
+      {code:"T3.4 D3.4", v:"M13–M18", l:"PaaS for Grid-Edge (DTU lead). Grid-edge and near-real-time connectivity."},
+      {code:"T3.5", v:"M4–M30", l:"DS operationalised as a Service (Toolbox). Aligned with GA Table 1 KPI on cloud-edge in 4+ MSs."},
+      {code:"Dev components", v:"7", l:"OneNet, PGUI, EDDIE Framework, AIIDA, INSIEME Services, Center Denmark, ComFlex DER."},
+      {code:"D3.1 / D3.2", v:"M24 / M30", l:"Toolbox for energy DS (FHOOE, M24). PaaS cross-sectoral (DTU, M30). Gate: MI3b."},
+      {code:"MSs covered", v:"≥10", l:"GA Table 1 KPI: 15+ cross-MS solutions implemented in 10+ member states by M36."},
+    ],
+  },
+  WP4: {
+    title: "WP4 — CEEDS Deployments",
+    note: "Lead: EDA. Source: GA §4 WP4 task descriptions (T4.1–T4.8), GA Table 1 impact KPIs, and D4.1 evidence. Most evidence-rich WP — D4.1 provides the ground truth.",
+    items: [
+      {code:"Pilots", v:"20 / 20", l:"All 20 deployments planned across T4.2–T4.8. D4.1 documents all 20 at M12."},
+      {code:"D4.1 cadence", v:"5 versions", l:"M12 ✓ → M18 → M24 → M30 → D4.3 final (M36). Bi-annual bi-annual WP4 report."},
+      {code:"Reference models", v:"11 → 15+", l:"11 published at M12. architecture.insieme.energy. GA Table 1: ≥3 RMs in ≥3 MSs."},
+      {code:"Procedures", v:"≥54", l:"5 FCA (T4.4) + 16 CESU (T4.3) + 33 Demand Response (T4.4) + T4.5/T4.6/T4.7/T4.8."},
+      {code:"Use cases", v:"7 / 7", l:"All I-UC-1 to I-UC-7 covered by ≥1 primary pilot. Coverage complete at M12."},
+      {code:"EU MSs", v:"16", l:"GA Table 3: INSIEME deployments planned in 16 EU member states."},
+      {code:"Cross-border pairs", v:"34", l:"Dashboard cross-border matrix: 9 strong, 16 medium, 9 weak."},
+      {code:"EC in 2+ markets", v:"≥4", l:"GA Table 1 KPI: ≥4 EC operators deploying in 2+ member states."},
+      {code:"DSOs", v:"12", l:"GA §2.2: 12 European DSOs as beneficiaries in WP4 deployments."},
+      {code:"D4.2 / D4.3", v:"M18 / M36", l:"Intermediate report + deployment plans (EDA, M18). Final WP4 report (EDA, M36). MS8 gate."},
+    ],
+  },
+  WP5: {
+    title: "WP5 — Exploitation & Sustainability of CEEDS",
+    note: "Lead: ENERC. Source: GA §4 WP5 task descriptions (T5.1–T5.8), EO2 commitment, and TNO full report. Highest-risk WP for EO2. See Business Models section for full TNO analysis.",
+    items: [
+      {code:"T5.1 D5.1", v:"M18 → M36", l:"Analysis of impediments and best practices from deployments (ENERC, Confidential, updated bi-annually). Links to EO6."},
+      {code:"T5.2 D5.2", v:"M36", l:"Energy efficiency & future development roadmap (REN, Confidential, M36)."},
+      {code:"T5.3", v:"M10–M36", l:"CEEDS Governance model for CEEDS Operational Entity (lead: EDSO). Covers T5.5–T5.8. Load-bearing stone (TNO Stone 3)."},
+      {code:"T5.4 D5.3", v:"M36", l:"Business models and deployment model (ENERC, Confidential, M36). Key for EO2."},
+      {code:"T5.5", v:"M7–M36", l:"EU regulatory policy alignment. DG ENER, DG CNECT, ENTSO-E outputs. Linked to KID-6."},
+      {code:"T5.6", v:">50", l:"DSO round-table — ≥50 external participants (GA Table 6, KID-3). EDSO lead."},
+      {code:"T5.7", v:">20", l:"TSO round-table — ≥20 external participants (GA Table 6, KID-3). REN lead."},
+      {code:"T5.8", v:"M7–M36", l:"External stakeholder alignment (SMA lead). Supports EO3 governance."},
+      {code:"EO2 deadline", v:"M30 ⚠", l:"TNO: M30 (Oct 2027) is the practical deadline to demonstrate willingness-to-pay from commercial pilot partners. Post-M30 = Valley of Death risk."},
+      {code:"D5.4", v:"M12 ✓", l:"Biannual DS Report v1 (ENERC, Public, M12 — PASSED)."},
+    ],
+  },
+  WP6: {
+    title: "WP6 — Dissemination & Communication",
+    note: "Lead: EREF. Source: Grant Agreement Table 6 — 14 preliminary KPIs (EXPLICIT GA KPIs). To be revised in D6.1 (M3) and updated in D6.5 (M18). KIDs = Key INSIEME Dissemination activities.",
+    items: [
+      {code:"KID-1", v:"~6 000", l:"Unique website visits"},
+      {code:"KID-1", v:">1 min", l:"Average visit time on website"},
+      {code:"KID-2", v:">70 000", l:"Impressions on social media (YouTube, Facebook, Instagram, LinkedIn)"},
+      {code:"KID-2", v:">1 000", l:"Likes on social media"},
+      {code:"KID-2", v:">2 / yr", l:"Videos released"},
+      {code:"KID-3", v:">50", l:"External participants at DSO round-table (T5.6)"},
+      {code:"KID-3", v:">20", l:"External participants at TSO round-table (T5.7)"},
+      {code:"KID-4", v:">500", l:"Newsletter recipients"},
+      {code:"KID-4", v:">4 / yr", l:"Newsletters released"},
+      {code:"KID-5", v:">10", l:"Events hosted around deployments"},
+      {code:"KID-6", v:">2", l:"Policy papers contributed to (national + EU policymakers)"},
+      {code:"KID-8", v:">6", l:"EU level organisations and initiatives worked with"},
+      {code:"KID-9", v:">6", l:"Reports on connections to different data spaces released"},
+      {code:"KID-10", v:">10", l:"Conferences and events with representation"},
+    ],
+  },
+};
+
+function renderWPKpis(wp){
+  const data = WP_KPIS[wp];
+  if(!data) return;
+  const sourceTag = (data.note.includes('EXPLICIT GA KPIs')) ?
+    `<span style="background:#3ecf8e22;color:#3ecf8e;border:1px solid #3ecf8e;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;margin-left:8px">EXPLICIT GA KPI TABLE</span>` :
+    `<span style="background:#f5a62322;color:#f5a623;border:1px solid #f5a623;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;margin-left:8px">TASK-DERIVED</span>`;
+  document.getElementById('wpKpiHeader').innerHTML =
+    `<div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap"><b style="color:var(--accent2)">${data.title}</b>${sourceTag}</div><div style="color:var(--muted);font-size:11px;margin-top:4px">${data.note}</div>`;
+  document.getElementById('wpKpis').innerHTML = data.items.map(k=>`
+    <div class="kpi-card"><div class="kid">${k.code}</div><div class="v">${k.v}</div><div class="l">${k.l}</div></div>
+  `).join('');
+}
+document.querySelectorAll('.tab[data-wptab]').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab[data-wptab]').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    renderWPKpis(t.dataset.wptab);
+  });
+});
+renderWPKpis('WP1');
+
+
+/* ===================== MANAGEMENT GATES on the timeline ===================== */
+
+// 11 canonical milestones from the Grant Agreement "List of Milestones" table (Means of Verification).
+// MS1 = Project foundation (M3, FHOOE), MS2 = Data mgmt (M6, FHOOE), MS3 = Data spaces analysis (M6, FIT),
+// MS4 = Architecture + RE (M18, DTU), MS5 = Intermediate dissem (M18, FIT), MS6 = Toolbox DS (M24, FHOOE),
+// MS7 = PaaS cross-sectoral (M30, DTU), MS8 = Deployments in place (M33, EDA), MS9 = CEEDS impact (M36, ENERC),
+// MS10 = Updated reports (M36, FHOOE), MS11 = Bi-annual DS report update (M12, EDA — already passed in May 2026).
+const MI_GATES = [
+  {m:3,  label:"MS1: Project foundation",   passed:true,  wp:"WP1+WP6", lead:"FHOOE",
+   detail:"Kick-off held, EB meetings established, D1.1 (PMP) and D6.1 (Dissemination Plan) submitted."},
+  {m:6,  label:"MS2: Data mgmt foundation", passed:true,  wp:"WP1",     lead:"FHOOE",
+   detail:"First DGEC meeting held, D1.2 (Data Management Plan) submitted."},
+  {m:6,  label:"MS3: DS analysis",          passed:true,  wp:"WP2",     lead:"FIT",
+   detail:"D2.1 (Analysis of existing data space initiatives) submitted, D4.1 first version submitted."},
+  {m:12, label:"MS11: D4.1 bi-annual",      passed:true,  wp:"WP4",     lead:"EDA",
+   detail:"D4.1 first bi-annual update submitted (this report, M12 = March 2026)."},
+  {m:18, label:"MS4: RE + Architecture",    passed:false, wp:"WP4+WP2", lead:"DTU",
+   detail:"D4.1 update, D2.2 (CEEDS Architecture), D2.3 (Security & privacy assessment) submitted. Standing project gate."},
+  {m:18, label:"MS5: Intermediate dissem",  passed:false, wp:"WP5+WP6", lead:"FIT",
+   detail:"D5.1 (TSO/DSO/industrial round-tables report) and D6.3 submitted."},
+  {m:24, label:"MS6: Toolbox energy DS",    passed:false, wp:"WP3",     lead:"FHOOE",
+   detail:"D3.1 (Toolbox for existing energy data spaces) submitted — first WP3 demonstrator."},
+  {m:30, label:"MS7: PaaS cross-sectoral",  passed:false, wp:"WP3",     lead:"DTU",
+   detail:"D3.2 (Cross-sectoral toolbox), D3.3 (CEEDS facilitation services), D4.1 update — biggest tech gate."},
+  {m:33, label:"MS8: Deployments in place", passed:false, wp:"WP4",     lead:"EDA",
+   detail:"D4.1 update + D4.2 (Intermediate report on deployments). All 20 pilots operational."},
+  {m:36, label:"MS9: CEEDS impact",         passed:false, wp:"WP5",     lead:"ENERC",
+   detail:"D5.1 updated + D5.2 (Impediments and best practices) + D5.3 (Impact, business models, sustainability) submitted."},
+  {m:36, label:"MS10: Updated reports",     passed:false, wp:"WP6+WP1+WP2", lead:"FHOOE",
+   detail:"D1.1, D1.2, D2.3 updated, D6.5 (Updated D&C Plan) submitted. Project close."},
+];
+
+// Inject MI gates onto the existing timeline
+(function injectMIGates(){
+  const axis = document.getElementById('timelineAxis');
+  if(!axis) return;
+  MI_GATES.forEach(g=>{
+    const pct = (g.m/36)*100;
+    const dot = document.createElement('div');
+    dot.className = 'mi-gate' + (g.passed ? ' passed' : '');
+    dot.style.left = pct + '%';
+    dot.title = g.label + ' — ' + g.detail;
+    dot.addEventListener('click', ()=>{
+      document.getElementById('msDetail').innerHTML = `
+        <h3>Management Gate — ${g.label}</h3>
+        <div style="margin-bottom:6px;color:${g.passed?'var(--good)':'var(--warn)'}"><b>${g.passed?'PASSED':'UPCOMING'}</b> at M${g.m} &middot; ${g.wp} &middot; Lead: ${g.lead}</div>
+        <div>${g.detail}</div>`;
+    });
+    axis.appendChild(dot);
+  });
+})();
+
+</script>
+</body>
+</html>

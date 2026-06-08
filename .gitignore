@@ -1,0 +1,16 @@
+# Secrets / local env
+.env
+.env.*
+*.local
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
+# OS / editor
+.DS_Store
